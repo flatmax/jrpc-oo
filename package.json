@@ -1,0 +1,19 @@
+{
+  "name": "@flatmax/jrpc-oo",
+  "description": "Expose objects using the JRPC2 protocol.",
+  "version": "1.0.0",
+  "main": "jrpc-client.js",
+  "scripts": {
+    "start": "./JRPCToolsTest.sh"
+  },
+  "devDependencies": {
+    "@material/mwc-button": "^0.22.0"
+  },
+  "dependencies": {
+    "jrpc": "^3.1.2",
+    "lit": "^2.0.2",
+    "ws": "^8.3.0"
+  },
+  "author": "Flatmax Pty Ltd",
+  "license": "MIT"
+}

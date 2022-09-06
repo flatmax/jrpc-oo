@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
+
+    <title>dual jrpc-client demo</title>
+
+    <script type="module">
+      import './dual-jrpc.js'
+    </script>
+  </head>
+  <body>
+    <h3>dual jrpc-client demo</h3>
+    <button onclick="testBashSyncProc()">TestBashSyncProc</button>
+    <button onclick="testBashAsyncProc()">TestBashAsyncProc</button>
+    <button onclick="testJsSyncProc()">TestJsSyncProc</button>
+    <dual-jrpc serverURI="ws://127.0.0.1:9000"></dual-jrpc> <!-- first jrpc client -->
+    <dual-jrpc serverURI="ws://127.0.0.1:9001"></dual-jrpc> <!-- second jrpc client -->
+    <script>
+      let dj = document.querySelectorAll("dual-jrpc");
+      function testBashSyncProc() {
+        dj[0].server['JRPCToolsDuoTest.TestBashSyncProc']()
+        dj[1].server['JRPCToolsDuoTest.TestBashSyncProc']()
+      }
+      function testBashAsyncProc() {
+        dj[0].server['JRPCToolsDuoTest.TestBashAsyncProc']()
+        dj[1].server['JRPCToolsDuoTest.TestBashAsyncProc']()
+      }
+      function testJsSyncProc() {
+        dj[0].server['JRPCToolsDuoTest.TestJsSyncProc']()
+        dj[1].server['JRPCToolsDuoTest.TestJsSyncProc']()
+      }
+    </script>
+  </body>
+</html>
