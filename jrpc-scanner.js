@@ -29,13 +29,13 @@
  */
  
 import { LitElement } from 'lit';
-import {JrpcClient} from './jrpc-client.js'
+import {JRPCClient} from './jrpc-client.js'
 
 /** This JRPC client is used t fire events notifying of the server's presence.
 Also indicates to the scanning process when to delete this object.
 */
-class JrpcDispatchClient extends JrpcClient {
-  /** overload the JrpcClient's setupdone method to fire the event
+class JrpcDispatchClient extends JRPCClient {
+  /** overload the JRPCClient's setupdone method to fire the event
   */
   setupDone(){
     super.setupDone();

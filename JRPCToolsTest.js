@@ -31,7 +31,7 @@
 JRPCTools = require('./JRPCTools');
 
 /** The functions for this test class will automatically be extracted for use with jrpc*/
-class testClass {
+class TestClass {
   constructor(){
     this.test=1;
   }
@@ -57,24 +57,24 @@ class testClass {
 
   echoBack(args){
     console.log('echoBack '+args)
-    setTimeout(this.server['LocalJrpc.echoBack'].bind(this),1000, 'nodejs responding');
+    setTimeout(this.server['LocalJRPC.echoBack'].bind(this),1000, 'nodejs responding');
     return 'nodejs returning done';
   }
 
-  'LocalJrpc.echoBack'(args){
+  'LocalJRPC.echoBack'(args){
     console.log('echoBack returns');
-    console.log(args);
+    console.log(JSON.stringify(args, null, 2));
   }
 }
 
-class testClass2 extends testClass {
+class TestClass2 extends TestClass {
   fn3(args){
-      console.log(args);
+      console.log(JSON.stringify(args, null, 2));
       return 'this is fn3';
   }
 }
 
-tc2=new testClass2; // this class will be used over js-JRPC
+tc2=new TestClass2; // this class will be used over js-JRPC
 
 // start the server and add the class.
 var JrpcServer=new JRPCTools.JRPCServer(9000); // start a server on port 9000

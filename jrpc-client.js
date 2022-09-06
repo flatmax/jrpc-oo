@@ -47,7 +47,7 @@ let JRPCCommon = Window.JRPCCommon;
   * @litelement
   * @demo demo/index.html
   */
-export class JrpcClient extends JRPCCommon {
+export class JRPCClient extends JRPCCommon {
   static get properties() {
     return {
       serverURI: { type: String },
@@ -132,4 +132,4 @@ export class JrpcClient extends JRPCCommon {
   }
 }
 
-if(!window.customElements.get('jrpc-client')) { window.customElements.define('jrpc-client', JrpcClient); }
+if(!window.customElements.get('jrpc-client')) { window.customElements.define('jrpc-client', JRPCClient); }

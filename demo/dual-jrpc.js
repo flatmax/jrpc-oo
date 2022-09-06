@@ -27,9 +27,9 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-import { JrpcClient } from '../jrpc-client.js';
+import { JRPCClient } from '../jrpc-client.js';
 
-class DualJrpc extends JrpcClient {
+class DualJrpc extends JRPCClient {
   setupDone() {
     console.log('Server connected : ', this.serverURI)
   }
