@@ -1,7 +1,7 @@
 {
   "name": "@flatmax/jrpc-oo",
   "description": "Expose objects using the JRPC2 protocol.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "jrpc-client.js",
   "scripts": {
     "start": "./JRPCToolsTest.sh"
