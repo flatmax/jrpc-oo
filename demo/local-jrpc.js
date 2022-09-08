@@ -74,6 +74,22 @@ export class LocalJRPC extends JRPCClient {
     this.shadowRoot.appendChild(btn);
   }
 
+  /** Overloading JRPCCLient::serverChanged to print out the websocket address
+  */
+  serverChanged(){
+      console.log('Make sure ws url = '+this.serverURI+' has browser serurity clearance');
+      console.log('to do this, goto '+this.serverURI.replace('wss','https')+' in a new browser tab replacing the wss for https\n do this each time the local cert changes or times out');
+      super.serverChanged();
+  }
+
+  /** JRPCClient::setupSkip calls this overload on websocket connection errors
+  */
+  setupSkip(){
+    super.setupSkip();
+    console.log('is JRPC-OO.node.js running ?')
+    console.log('is the ws url cleared with the browser for access ?')
+  }
+
   remoteIsUp(){
     console.log('LocalJRPC::remoteIsUp')
     this.addClass(this);
