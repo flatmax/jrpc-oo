@@ -108,6 +108,12 @@ class JRPCCommon extends LitElement {
             console.log('Error when calling remote function : '+fnName);
             console.log(err);
           } else // call the overloaded function
+           if (self.constructor.name === 'JRPCServer') // nodejs
+             if (this[fnName]==null)
+               console.log("function not defined Error : "+fnName+" is not in your element, please define this function.");
+             else
+               this[fnName](result);
+           else // browser
             if (self[fnName]==null)
               console.log("function not defined Error : "+fnName+" is not in your element, please define this function.");
             else
