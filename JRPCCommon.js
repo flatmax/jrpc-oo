@@ -37,6 +37,7 @@ if (typeof module !== 'undefined' && typeof module.exports !== 'undefined'){  //
 } else {  // browser
   var ExposeClass = Window.ExposeClass;
   var LitElement = Window.LitElement; // load in the correct class for the browser
+  var JRPC = Window.JRPC;
 }
 
 class JRPCCommon extends LitElement {
@@ -44,11 +45,7 @@ class JRPCCommon extends LitElement {
   @return the new remote
   */
   newRemote(){
-    let remote;
-    if (typeof Window === 'undefined') // nodejs
-      remote = new JRPC({ remoteTimeout: this.remoteTimeout }); // setup the remote
-    else // browser
-      remote = new Window.JRPC({ remoteTimeout: this.remoteTimeout }); // setup the remote
+    let remote = new JRPC({ remoteTimeout: this.remoteTimeout }); // setup the remote
     if (this.remote==null)
       this.remote = [remote];
     else
@@ -107,17 +104,16 @@ class JRPCCommon extends LitElement {
           if (err) {
             console.log('Error when calling remote function : '+fnName);
             console.log(err);
-          } else // call the overloaded function
-           if (self.constructor.name === 'JRPCServer') // nodejs
-             if (this[fnName]==null)
-               console.log("function not defined Error : "+fnName+" is not in your element, please define this function.");
-             else
-               this[fnName](result);
-           else // browser
+            console.log(fnName+' returns :');
+            console.log(result);
+          } else { // call the overloaded function
+            if (self.constructor.name === 'JRPCServer')
+              self=this; // we aren't inherited, so operate on this
             if (self[fnName]==null)
               console.log("function not defined Error : "+fnName+" is not in your element, please define this function.");
             else
               self[fnName](result);
+          }
         });
       };
     });
