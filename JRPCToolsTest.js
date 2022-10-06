@@ -50,6 +50,7 @@ class TestClass {
     console.log('');
     console.log('arg2 :');
     console.log(JSON.stringify(arg2, null, 2))
+    console.log('NOTE: no return handler in the browser')
     return arg1;
   }
 

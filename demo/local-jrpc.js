@@ -124,12 +124,6 @@ export class LocalJRPC extends JRPCClient {
     console.log('local-jrpc : TestClass.fn1 : params = '+JSON.stringify(params, null, 2))
   }
 
-  // Don't define this function to force jrpc-client to react to a missing function
-  // 'TestClass.fn2'(params){
-  //   console.log('local-client : response from the server :')
-  //   console.log('local-jrpc : TestClass.fn2 : params = '+JSON.stringify(params, null, 2))
-  // }
-
   /** This function is defined on the server, when we call
   this.server.system.listComponents()
   This function will be called to process the server's response.
