@@ -65,6 +65,33 @@ class TestClass {
     console.log('echoBack returns');
     console.log(JSON.stringify(args, null, 2));
   }
+
+  echoBackWithCallback(callback, arg){
+    console.log('echoBackWithCallback');
+    console.log(arg);
+    // Call the provided callback by name, with 1 sec delay and 2 args on the callback
+    setTimeout(() => this.server[callback]('echo from nodejs with 2-arg anon callback for return', (err, result) => {
+      if (err) {
+        console.log('Got error: ');
+        console.log(err);
+      } else {
+        console.log('in 2-arg callback, got return result from client: '+result);
+      }
+    }), 1000);
+    // Call the provided callback by name, with 2 sec delay and 1 arg on the callback
+    setTimeout(() => this.server[callback]('echo from nodejs with 1-arg anon callback for return', (result) => {
+      console.log('in 1-arg callback, got return result from client: '+result);
+    }), 2000);
+    // Call the provided callback by name, with 3 sec delay and 0 args on the callback
+    setTimeout(() => this.server[callback]('echo from nodejs with 0-arg anon callback for return', () => {
+      // normally we just leave this empty, as if we are not looking at the return result we don't care about the response
+      // For testing, however, print that the call did return
+      console.log('in 0-arg callback, got return from client');
+    }), 3000);
+
+    // This is the result that gets returned from this call
+    return 'nodejs returning done';
+  }
 }
 
 class TestClass2 extends TestClass {
