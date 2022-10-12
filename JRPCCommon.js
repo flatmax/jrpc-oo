@@ -112,7 +112,14 @@ class JRPCCommon extends LitElement {
           let args = {args: Array.from(arguments).slice(0,-1)};
           switch (callback.length) {
             case 0:    // Caller doesn't want a result
-              remote.call(fnName, args, (err, result) => { callback() });
+              remote.call(fnName, args, (err, result) => {
+                if (err) {
+                  console.log('Error when calling remote function : '+fnName);
+                  console.log(err);
+                } else {
+                  callback();
+                }
+              });
               break;
             case 1:    // Callback takes a single arg, so provide default error handling
               remote.call(fnName, args, (err, result) => {
