@@ -72,6 +72,14 @@ export class LocalJRPC extends JRPCClient {
     btn.onclick=this.startEchoChamber.bind(this);
     btn.textContent='startEcho';
     this.shadowRoot.appendChild(btn);
+
+    // add a button to test anon callbacks
+    btn=document.createElement('mwc-button');
+    btn.raised=true; btn.elevation=10;
+    btn.onclick=this.testAnonCallback;
+    btn.textContent='TestClass anon callbacks using echoBackWithCallback';
+    this.shadowRoot.appendChild(btn);
+
   }
 
   /** Overloading JRPCCLient::serverChanged to print out the websocket address
@@ -113,6 +121,25 @@ export class LocalJRPC extends JRPCClient {
       lj.server['TestClass.fn1']();
     else
       console.log('expected the server to expose a class TestClass with function fn1 but couldn\'t find it');
+  }
+
+  /** This method passed a callback by name for an echo, and uses anonymous callbacks for return.
+  */
+  testAnonCallback() {
+    let arg={0: 'test', 1: [ 1 ,2], 2: 'this function'};
+    var lj = document.querySelector('local-jrpc');
+    if (lj.server['TestClass.echoBackWithCallback']!=null) {
+      lj.server['TestClass.echoBackWithCallback']('LocalJRPC.thisIsTheEchoCallBack', arg, (result) => {
+        console.log('This is the result from the call: '+result);
+      });
+    } else {
+      console.log('expected the server to expose a class TestClass with function echoBackWithCallback but couldn\'t find it');
+    }
+  }
+  thisIsTheEchoCallBack(arg) {
+    console.log('Got an echo from the server: ' + arg); 
+    // This gets sent back to the server
+    return ('OK we got the echo, this is a return result if you want it');
   }
 
   /** This function is defined on the server, when we call
