@@ -57,13 +57,17 @@ class TestClass {
 
   echoBack(args){
     console.log('echoBack '+args)
-    setTimeout(this.server['LocalJRPC.echoBack'].bind(this),1000, 'nodejs responding');
+    setTimeout(this.callEchoBack.bind(this),1000, 'nodejs responding')
     return 'nodejs returning done';
   }
 
-  'LocalJRPC.echoBack'(args){
-    console.log('echoBack returns');
-    console.log(JSON.stringify(args, null, 2));
+  callEchoBack(args){
+    this.server['LocalJRPC.echoBack'](args)
+    .then((result)=>{
+      console.log('echoBack returns');
+      console.log(JSON.stringify(result, null, 2));
+    });
+
   }
 }
 

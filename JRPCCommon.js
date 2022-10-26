@@ -103,21 +103,14 @@ class JRPCCommon extends LitElement {
       if (this.server==null)
         this.server={};
       this.server[fnName] = function (params) {
-        remote.call(fnName, {args : Array.from(arguments)}, (err, result) => {
-          if (err) {
-            console.log('Error when calling remote function : '+fnName);
-            console.log(err);
-          } else // call the overloaded function
-           if (self.constructor.name === 'JRPCServer') // nodejs
-             if (this[fnName]==null)
-               console.log("function not defined Error : "+fnName+" is not in your element, please define this function.");
-             else
-               this[fnName](result);
-           else // browser
-            if (self[fnName]==null)
-              console.log("function not defined Error : "+fnName+" is not in your element, please define this function.");
-            else
-              self[fnName](result);
+        return new Promise((resolve, reject) => {
+          remote.call(fnName, {args : Array.from(arguments)}, (err, result) => {
+              if (err) {
+                console.log('Error when calling remote function : '+fnName);
+                reject(err);
+              } else // resolve
+                resolve(result);
+          });
         });
       };
     });

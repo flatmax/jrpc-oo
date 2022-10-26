@@ -50,15 +50,33 @@
       let dj = document.querySelectorAll("dual-jrpc");
       function testBashSyncProc() {
         dj[0].server['JRPCToolsDuoTest.TestBashSyncProc']()
+        .then(()->{
+          console.log('TestBashSyncProc callback from the server ', this.serverURI)
+        });
         dj[1].server['JRPCToolsDuoTest.TestBashSyncProc']()
+        .then(()->{
+          console.log('TestBashSyncProc callback from the server ', this.serverURI)
+        });
       }
       function testBashAsyncProc() {
         dj[0].server['JRPCToolsDuoTest.TestBashAsyncProc']()
+        .then(()->{
+          console.log('TestBashAsyncProc callback from the server ', this.serverURI)
+        });
         dj[1].server['JRPCToolsDuoTest.TestBashAsyncProc']()
+        .then(()->{
+          console.log('TestBashAsyncProc callback from the server ', this.serverURI)
+        });
       }
       function testJsSyncProc() {
         dj[0].server['JRPCToolsDuoTest.TestJsSyncProc']()
+        .then(()->{
+          console.log('TestJsSyncProc callback from the server ', this.serverURI)
+        });
         dj[1].server['JRPCToolsDuoTest.TestJsSyncProc']()
+        .then(()->{
+          console.log('TestJsSyncProc callback from the server ', this.serverURI)
+        });
       }
     </script>
   </body>

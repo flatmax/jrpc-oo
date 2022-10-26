@@ -100,7 +100,11 @@ export class LocalJRPC extends JRPCClient {
   testArgPass() {
     var lj = document.querySelector('local-jrpc');
     if (lj.server['TestClass.fn2']!=null)
-      lj.server['TestClass.fn2'](1, {0: 'test', 1: [ 1 ,2], 2: 'this function'});
+      lj.server['TestClass.fn2'](1, {0: 'test', 1: [ 1 ,2], 2: 'this function'})
+      .then((result)=>{
+        console.log(result);
+      })
+      .catch((e)=>{console.error(e.message)});
     else
       console.log('expected the server to expose a class TestClass with function fn2 but couldn\'t find it');
   }
@@ -110,32 +114,13 @@ export class LocalJRPC extends JRPCClient {
   testNoArgPass() {
     var lj = document.querySelector('local-jrpc');
     if (lj.server['TestClass.fn1']!=null)
-      lj.server['TestClass.fn1']();
+      lj.server['TestClass.fn1']()
+      .then((result)=>{
+        console.log(result);
+      })
+      .catch((e)=>{console.error(e.message)});
     else
       console.log('expected the server to expose a class TestClass with function fn1 but couldn\'t find it');
-  }
-
-  /** This function is defined on the server, when we call
-  this.server['TestClass.fn1']()
-  This function will be called to process the server's response.
-  */
-  'TestClass.fn1'(params) {
-    console.log('local-client : response from the server :')
-    console.log('local-jrpc : TestClass.fn1 : params = '+JSON.stringify(params, null, 2))
-  }
-
-  // Don't define this function to force jrpc-client to react to a missing function
-  // 'TestClass.fn2'(params){
-  //   console.log('local-client : response from the server :')
-  //   console.log('local-jrpc : TestClass.fn2 : params = '+JSON.stringify(params, null, 2))
-  // }
-
-  /** This function is defined on the server, when we call
-  this.server.system.listComponents()
-  This function will be called to process the server's response.
-  */
-  'system.listComponents'(params) {
-    console.log('local-jrpc : system.listComponents : params = '+JSON.stringify(params, null, 2))
   }
 
   startEchoChamber(){
@@ -145,15 +130,14 @@ export class LocalJRPC extends JRPCClient {
   echoBack(args){
     console.log('echoBack '+args)
     if (this.server['TestClass.echoBack']!=null)
-      this.server['TestClass.echoBack']('this is the browser saying echo');
+      this.server['TestClass.echoBack']('this is the browser saying echo')
+      .then((args)=> {
+        console.log('TestClass.echoBack returned:');
+        console.log(JSON.stringify(args, null, 2));
+      })
     else
       console.log('expected the server to expose a class TestClass with function echoBack but couldn\'t find it');
     return 'echoBack returned you this';
-  }
-
-  'TestClass.echoBack'(args){
-    console.log('TestClass.echoBack returned:');
-    console.log(JSON.stringify(args, null, 2));
   }
 }
 
