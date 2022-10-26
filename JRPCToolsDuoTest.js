@@ -28,13 +28,13 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
- 
+
 /**
  * Test class to demoing dual jrpc server
  */
 
 "use strict";
-const JRPCTools = require('./JRPCTools');
+const JRPCServer = require('./JRPCServer');
 
 const execSync = require("child_process").execSync;
 const { exec } = require("child_process");
@@ -98,10 +98,10 @@ let duoTest = new JRPCToolsDuoTest;
 
 let ssl=false;
 // Run first instance on port 9000
-let JrpcServer=new JRPCTools.JRPCServer(9000, 300, ssl);
+let JrpcServer=new JRPCServer.JRPCServer(9000, 300, ssl);
 JrpcServer.addClass(firstTest);
 // Run second instance on port 9001
-let JrpcServer2=new JRPCTools.JRPCServer(9001, 300, ssl);
+let JrpcServer2=new JRPCServer.JRPCServer(9001, 300, ssl);
 JrpcServer2.addClass(duoTest);
 
 console.log("Server is listening");

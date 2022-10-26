@@ -4,7 +4,7 @@
   "version": "1.1.0",
   "main": "jrpc-client.js",
   "scripts": {
-    "start": "./JRPCToolsTest.sh"
+    "start": "./JRPCServerTest.sh"
   },
   "devDependencies": {
     "@material/mwc-button": "^0.22.0"

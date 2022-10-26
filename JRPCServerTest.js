@@ -28,7 +28,7 @@
   # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   */
-JRPCTools = require('./JRPCTools');
+JRPCServer = require('./JRPCServer');
 
 /** The functions for this test class will automatically be extracted for use with jrpc*/
 class TestClass {
@@ -81,5 +81,5 @@ class TestClass2 extends TestClass {
 tc2=new TestClass2; // this class will be used over js-JRPC
 
 // start the server and add the class.
-var JrpcServer=new JRPCTools.JRPCServer(9000); // start a server on port 9000
+var JrpcServer=new JRPCServer.JRPCServer(9000); // start a server on port 9000
 JrpcServer.addClass(tc2); // setup the class for remote use over the network

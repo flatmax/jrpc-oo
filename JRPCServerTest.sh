@@ -5,7 +5,7 @@ rm -rf cert.server; mkdir -p cert.server; ln -s cert.server cert
 openssl req -newkey rsa:2048 -new -nodes -x509 -days 365 -keyout cert.server/server.key -out cert.server/server.crt
 
 echo
-echo Don\'t forget to run ./JRPCToolsTest.js
+echo Don\'t forget to run ./JRPCTServerTest.js
 echo Don\'t forget to open https://0.0.0.0:9000 in the browser to clear security issues as we are using wss with locally generated certs.
 echo
 polymer serve -P https/1.1 --hostname 0.0.0.0 --key cert.client/key.pem --cert cert.client/cert.pem
