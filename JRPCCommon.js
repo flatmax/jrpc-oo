@@ -30,11 +30,16 @@
 
 "use strict";
 
+var crypto = {};
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined'){  // nodejs
-  var ExposeClass = require("./ExposeClass.js")
+  var ExposeClass = require("./ExposeClass.js");
+  crypto = require('crypto');
+  if (!crypto.randomUUID)
+    crypto.randomUUID = ()=>{return crypto.randomBytes(32).toString('base64');};
   var JRPC = require('jrpc');
   var LitElement=class {};
 } else {  // browser
+  crypto = self.crypto;
   var ExposeClass = Window.ExposeClass;
   var LitElement = Window.LitElement; // load in the correct class for the browser
 }
@@ -49,10 +54,10 @@ class JRPCCommon extends LitElement {
       remote = new JRPC({ remoteTimeout: this.remoteTimeout }); // setup the remote
     else // browser
       remote = new Window.JRPC({ remoteTimeout: this.remoteTimeout }); // setup the remote
-    if (this.remote==null)
-      this.remote = [remote];
-    else
-      this.remote.push(remote);
+    remote.uuid = crypto.randomUUID();
+    if (this.remotes==null)
+      this.remotes = {};
+    this.remotes[remote.uuid]=remote;
     return remote;
   }
 
@@ -137,11 +142,11 @@ class JRPCCommon extends LitElement {
     else
       this.classes.push(jrpcObj);
 
-    if (this.remote!=null) // update all existing remotes
-      this.remote.forEach(function(remote){
+    if (this.remotes!=null) // update all existing remotes
+      for (const [uuid, remote] of Object.entries(this.remotes)) {
         remote.expose(jrpcObj); // expose the functions from the class
         remote.upgrade();  // Handshake extended capabilities
-      });
+      }
   }
 }
 
