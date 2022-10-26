@@ -45,15 +45,6 @@ export class LocalJRPC extends JRPCClient {
   Create a button for each of the available functions.
   */
   setupDone() {
-    Object.keys(this.server).forEach(fn => {
-      if (fn.indexOf('.server')<0 && fn.indexOf('.dual-batch')<0){
-        let btn=document.createElement('mwc-button');
-        btn.raised=true; btn.elevation=10;
-        btn.onclick=this.server[fn];
-        btn.textContent=fn;
-        this.shadowRoot.appendChild(btn);
-      }
-    });
     // add a button to test argument passing
     let btn=document.createElement('mwc-button');
     btn.raised=true; btn.elevation=10;
