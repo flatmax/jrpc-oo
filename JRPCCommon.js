@@ -30,11 +30,16 @@
 
 "use strict";
 
+var crypto = {};
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined'){  // nodejs
-  var ExposeClass = require("./ExposeClass.js")
+  var ExposeClass = require("./ExposeClass.js");
+  crypto = require('crypto');
+  if (!crypto.randomUUID)
+    crypto.randomUUID = ()=>{return crypto.randomBytes(32).toString('base64');};
   var JRPC = require('jrpc');
   var LitElement=class {};
 } else {  // browser
+  crypto = self.crypto;
   var ExposeClass = Window.ExposeClass;
   var LitElement = Window.LitElement; // load in the correct class for the browser
 }
@@ -49,11 +54,25 @@ class JRPCCommon extends LitElement {
       remote = new JRPC({ remoteTimeout: this.remoteTimeout }); // setup the remote
     else // browser
       remote = new Window.JRPC({ remoteTimeout: this.remoteTimeout }); // setup the remote
-    if (this.remote==null)
-      this.remote = [remote];
-    else
-      this.remote.push(remote);
+    remote.uuid = crypto.randomUUID();
+    if (this.remotes==null)
+      this.remotes = {};
+    this.remotes[remote.uuid]=remote;
     return remote;
+  }
+
+  /** Remove the remote
+  @param uuid The uuid of the remote to remove
+  */
+  rmRemote(e, buf, uuid){
+    // this.server to be removed in the future.
+    if (this.server) {
+      // remove the methods in the remote from the server
+      if (this.remotes[uuid]){
+        Object.keys(this.remotes[uuid].rpcs).forEach((fn) => delete this.server[fn]);
+        delete this.remotes[uuid];
+      }
+    }
   }
 
   /** expose classes and handle the setting up of remote's functions
@@ -100,9 +119,11 @@ class JRPCCommon extends LitElement {
   setupFns(fnNames, remote){
      let self=this;
      fnNames.forEach(fnName => {
-      if (this.server==null)
-        this.server={};
-      this.server[fnName] = function (params) {
+      if (remote.rpcs==null) // each remote holds its own rpcs
+        remote.rpcs={};
+
+      // each remote's rpcs will hold the functino to call and returns a promise
+      remote.rpcs[fnName] = function (params) {
         return new Promise((resolve, reject) => {
           remote.call(fnName, {args : Array.from(arguments)}, (err, result) => {
               if (err) {
@@ -113,6 +134,40 @@ class JRPCCommon extends LitElement {
           });
         });
       };
+
+      //////////////////////////////////////////////////
+      // For backwards compat - START TO BE REMOVED IN FUTURE
+      // if server has a spare spot for that fnName, use it
+      // otherwise error out in use (we don't know whot to talk to)
+      if (this.server == null) // server holds all remote's rpcs
+        this.server={};
+      if (this.server[fnName]==null){ // first time in use
+        // console.log(fnName+' not in server');
+        // note this code should be the same as remote.rpcs[fnName]
+        // replicating code here to ensure we don't mess with the orignal
+        // remote.rpcs[fnNAme] reference if the else case is triggered in future
+        this.server[fnName] = function (params) {
+          return new Promise((resolve, reject) => {
+            remote.call(fnName, {args : Array.from(arguments)}, (err, result) => {
+                if (err) {
+                  console.log('Error when calling remote function : '+fnName);
+                  reject(err);
+                } else // resolve
+                  resolve(result);
+            });
+          });
+        };
+      } else { // some other remote already uses this fnName, error out
+        console.log(fnName+' in server, rejecting calls');
+        this.server[fnName] = function (params) {
+          return new Promise((resolve, reject) => {
+            reject(new Error('More then one remote has this RPC, not sure who to talk to : '+fnName));
+          });
+        }
+      }
+      // For backwards compat - END TO BE REMOVED IN FUTURE
+      //////////////////////////////////////////////////
+
     });
     this.setupDone();
   }
@@ -137,11 +192,11 @@ class JRPCCommon extends LitElement {
     else
       this.classes.push(jrpcObj);
 
-    if (this.remote!=null) // update all existing remotes
-      this.remote.forEach(function(remote){
+    if (this.remotes!=null) // update all existing remotes
+      for (const [uuid, remote] of Object.entries(this.remotes)) {
         remote.expose(jrpcObj); // expose the functions from the class
         remote.upgrade();  // Handshake extended capabilities
-      });
+      }
   }
 }
 
