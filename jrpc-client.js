@@ -27,7 +27,7 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
- 
+
 import './ExposeClass';
 import './ExportLit';
 import './JRPCExport';
@@ -81,7 +81,7 @@ export class JRPCClient extends JRPCCommon {
       this.ws = new WebSocket(this.serverURI);
       // set the wss reference to this
       console.assert(this.ws.parent == null, 'wss.parent already exists, this needs upgrade.')
-      this.ws.addEventListener('open', this.createRemote.bind(this), this);
+      this.ws.addEventListener('open', this.createRemote.bind(this));
       this.ws.addEventListener('error', this.wsError.bind(this));
     } catch (e) {
       this.serverURI = "";
@@ -97,28 +97,11 @@ export class JRPCClient extends JRPCCommon {
     this.setupSkip(ev);
   }
 
-  /** When a new websocket exists, setup the JRPC remote to handle message.
-  Also, call the server asking for all available functions to be reported.
-  */
-  createRemote(ev) {
-    let remote = this.newRemote();
-    this.remoteIsUp();
-
-    this.ws.onmessage = (evMsg) => { remote.receive(evMsg.data); };
-    this.setupRemote(remote, this.ws);
-  }
-
   /** Report if we are connected to a server or not
   @return true if connected to a server
   */
   isConnected() {
     return this.server != null && this.server != {};
-  }
-
-  /** Overload this to execute code when the remote comes up
-  */
-  remoteIsUp() {
-    console.log('JRPCClient::remoteIsUp')
   }
 
   /** This function is called once websocket refused / get error
