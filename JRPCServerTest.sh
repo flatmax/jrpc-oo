@@ -8,7 +8,9 @@ echo
 echo Don\'t forget to run ./JRPCTServerTest.js
 echo Don\'t forget to open https://0.0.0.0:9000 in the browser to clear security issues as we are using wss with locally generated certs.
 echo
-polymer serve -P https/1.1 --hostname 0.0.0.0 --key cert.client/key.pem --cert cert.client/cert.pem
+
+# serve the app with web-dev-server
+wds
 
 # Copyright (c) 2016-2018 The flatmax-elements Authors. All rights reserved.
 #
