@@ -76,6 +76,7 @@ class JRPCServer extends JRPCCommon {
   */
   createRemote(ws){
     let remote = this.newRemote();
+    ws.on('close', (...args)=>this.rmRemote.bind(this)(...args, remote.uuid), this);
 
     ws.on('message', function(data, isBinary) {
       const msg = isBinary ? data : data.toString(); // changes for upgrade to v8

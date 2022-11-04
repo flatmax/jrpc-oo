@@ -61,6 +61,20 @@ class JRPCCommon extends LitElement {
     return remote;
   }
 
+  /** Remove the remote
+  @param uuid The uuid of the remote to remove
+  */
+  rmRemote(e, buf, uuid){
+    // this.server to be removed in the future.
+    if (this.server) {
+      // remove the methods in the remote from the server
+      if (this.remotes[uuid]){
+        Object.keys(this.remotes[uuid].rpcs).forEach((fn) => delete this.server[fn]);
+        delete this.remotes[uuid];
+      }
+    }
+  }
+
   /** expose classes and handle the setting up of remote's functions
   @param remote the remote to setup
   @param ws the websocket for transmission
