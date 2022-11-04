@@ -44,6 +44,17 @@ if (typeof module !== 'undefined' && typeof module.exports !== 'undefined'){  //
   var LitElement = Window.LitElement; // load in the correct class for the browser
 }
 
+/** Call remotes in two different ways :
+To call one remote :
+  this.remote[uuid].rpcs[fnName](args)
+  .then((...)=>{...})
+  .catch(...)
+
+To call all remotes :
+  this.call[fnName](args)
+  .then((...)=>{...})
+  .catch(...)
+*/
 class JRPCCommon extends LitElement {
   /** Instansiate a new remote. It gets added to the array of remotes
   @return the new remote
@@ -94,18 +105,37 @@ class JRPCCommon extends LitElement {
   @param uuid The uuid of the remote to remove
   */
   rmRemote(e, uuid){
-    console.log(uuid)
+    // console.log(uuid)
     // console.log('before')
+    // console.log(this.remotes)
     // console.log(this.server)
-    // this.server to be removed in the future.
-    if (this.server) {
-      // remove the methods in the remote from the server
-      if (this.remotes[uuid]){
+
+    // NOTE : this.server to be removed in the future.
+    if (this.server) // remove the methods in the remote from the server
+      if (this.remotes[uuid])
         Object.keys(this.remotes[uuid].rpcs).forEach((fn) => delete this.server[fn]);
-        delete this.remotes[uuid];
+
+    if (Object.keys(this.remotes).length)
+      delete this.remotes[uuid];
+
+    if (this.call && Object.keys(this.remotes).length){
+      let remainingFns = []
+      for (const remote in this.remotes)
+        remainingFns = remainingFns.concat(Object.keys(this.remotes[remote].rpcs))
+      if (this.call) {
+        let existingFns = Object.keys(this.call);
+        for (let n=0; n<existingFns.length; n++)
+          if (remainingFns.indexOf(existingFns[n]) < 0)
+            delete this.call[existingFns[n]];
       }
-    }
+    } else
+      this.call={}; // reset the call all object
+
     // console.log('after')
+    // console.log('this.call after')
+    // console.log(this.call)
+    // console.log('this.remotes')
+    // console.log(this.remotes)
     // console.log(this.server)
   }
 
@@ -169,6 +199,22 @@ class JRPCCommon extends LitElement {
         });
       };
 
+      // the call structure is to call all remotes
+      if (this.call == null) // server holds all remote's rpcs
+        this.call={};
+      if (this.call[fnName]==null){ // first time in use
+        this.call[fnName] = function (...args) {
+            let promises = [];
+            for (const remote in this.remotes)
+              if (remote[fnName] != null){ // store promises as [uuid : function, ...]
+                let p = {};
+                p[remote.uuid] = remote[fnName].rpcs[fnName](...args);
+                promises.push(p);
+              }
+            return Promise.all(promises);
+        }
+      }
+
       //////////////////////////////////////////////////
       // For backwards compat - START TO BE REMOVED IN FUTURE
       // if server has a spare spot for that fnName, use it
@@ -201,8 +247,8 @@ class JRPCCommon extends LitElement {
       }
       // For backwards compat - END TO BE REMOVED IN FUTURE
       //////////////////////////////////////////////////
-
     });
+
     this.setupDone();
   }
 
