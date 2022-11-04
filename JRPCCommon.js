@@ -105,9 +105,11 @@ class JRPCCommon extends LitElement {
   setupFns(fnNames, remote){
      let self=this;
      fnNames.forEach(fnName => {
-      if (this.server==null)
-        this.server={};
-      this.server[fnName] = function (params) {
+      if (remote.rpcs==null) // each remote holds its own rpcs
+        remote.rpcs={};
+
+      // each remote's rpcs will hold the functino to call and returns a promise
+      remote.rpcs[fnName] = function (params) {
         return new Promise((resolve, reject) => {
           remote.call(fnName, {args : Array.from(arguments)}, (err, result) => {
               if (err) {
@@ -118,6 +120,40 @@ class JRPCCommon extends LitElement {
           });
         });
       };
+
+      //////////////////////////////////////////////////
+      // For backwards compat - START TO BE REMOVED IN FUTURE
+      // if server has a spare spot for that fnName, use it
+      // otherwise error out in use (we don't know whot to talk to)
+      if (this.server == null) // server holds all remote's rpcs
+        this.server={};
+      if (this.server[fnName]==null){ // first time in use
+        // console.log(fnName+' not in server');
+        // note this code should be the same as remote.rpcs[fnName]
+        // replicating code here to ensure we don't mess with the orignal
+        // remote.rpcs[fnNAme] reference if the else case is triggered in future
+        this.server[fnName] = function (params) {
+          return new Promise((resolve, reject) => {
+            remote.call(fnName, {args : Array.from(arguments)}, (err, result) => {
+                if (err) {
+                  console.log('Error when calling remote function : '+fnName);
+                  reject(err);
+                } else // resolve
+                  resolve(result);
+            });
+          });
+        };
+      } else { // some other remote already uses this fnName, error out
+        console.log(fnName+' in server, rejecting calls');
+        this.server[fnName] = function (params) {
+          return new Promise((resolve, reject) => {
+            reject(new Error('More then one remote has this RPC, not sure who to talk to : '+fnName));
+          });
+        }
+      }
+      // For backwards compat - END TO BE REMOVED IN FUTURE
+      //////////////////////////////////////////////////
+
     });
     this.setupDone();
   }
