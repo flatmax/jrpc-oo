@@ -61,10 +61,42 @@ class JRPCCommon extends LitElement {
     return remote;
   }
 
+  /** Function called by the WebSocket once 'connection' is fired
+  \param ws The web socket created by the web socket server (in the case of node)
+  */
+  createRemote(ws){
+    let remote = this.newRemote();
+    this.remoteIsUp();
+
+    if (this.ws) { // browser version of ws
+      ws=this.ws;
+      this.ws.onclose =  function (evMsg) {this.rmRemote(evMsg, remote.uuid)}.bind(this);
+      this.ws.onmessage = (evMsg) => { remote.receive(evMsg.data); };
+    } else { // node version of ws
+      ws.on('close', (evMsg, buf)=>this.rmRemote.bind(this)(evMsg, remote.uuid));
+      ws.on('message', function(data, isBinary) {
+        const msg = isBinary ? data : data.toString(); // changes for upgrade to v8
+        remote.receive(msg);
+      });
+    }
+
+    this.setupRemote(remote, ws);
+    return remote;
+  }
+
+  /** Overload this to execute code when the remote comes up
+  */
+  remoteIsUp() {
+    console.log('JRPCCommon::remoteIsUp')
+  }
+
   /** Remove the remote
   @param uuid The uuid of the remote to remove
   */
-  rmRemote(e, buf, uuid){
+  rmRemote(e, uuid){
+    console.log(uuid)
+    // console.log('before')
+    // console.log(this.server)
     // this.server to be removed in the future.
     if (this.server) {
       // remove the methods in the remote from the server
@@ -73,6 +105,8 @@ class JRPCCommon extends LitElement {
         delete this.remotes[uuid];
       }
     }
+    // console.log('after')
+    // console.log(this.server)
   }
 
   /** expose classes and handle the setting up of remote's functions

@@ -70,20 +70,6 @@ class JRPCServer extends JRPCCommon {
     // set the wss reference to this
     this.wss.on('connection', this.createRemote.bind(this), this);
   }
-
-  /** Function called by the WebSocketServer once 'connection' is fired
-  \param ws The web socket created by the web socket server
-  */
-  createRemote(ws){
-    let remote = this.newRemote();
-    ws.on('close', (...args)=>this.rmRemote.bind(this)(...args, remote.uuid), this);
-
-    ws.on('message', function(data, isBinary) {
-      const msg = isBinary ? data : data.toString(); // changes for upgrade to v8
-      remote.receive(msg);
-    });
-    this.setupRemote(remote, ws);
-  }
 }
 
 module.exports = {
