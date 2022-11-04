@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-rm -rf cert.client; mkdir -p cert.client
-openssl req -newkey rsa:2048 -new -nodes -x509 -days 365 -keyout cert.client/key.pem -out cert.client/cert.pem
-rm -rf cert.server; mkdir -p cert.server; ln -s cert.server cert
-openssl req -newkey rsa:2048 -new -nodes -x509 -days 365 -keyout cert.server/server.key -out cert.server/server.crt
+if [ ! -d cert.client ]; then
+  rm -rf cert.client; mkdir -p cert.client
+  openssl req -newkey rsa:2048 -new -nodes -x509 -days 365 -keyout cert.client/key.pem -out cert.client/cert.pem
+fi
+if [ ! -d cert.server ]; then
+  rm -rf cert.server; mkdir -p cert.server; ln -s cert.server cert
+  openssl req -newkey rsa:2048 -new -nodes -x509 -days 365 -keyout cert.server/server.key -out cert.server/server.crt
+fi
 
 echo
 echo Don\'t forget to run ./JRPCTServerTest.js
