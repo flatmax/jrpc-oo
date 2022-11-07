@@ -203,15 +203,20 @@ class JRPCCommon extends LitElement {
       if (this.call == null) // server holds all remote's rpcs
         this.call={};
       if (this.call[fnName]==null){ // first time in use
-        this.call[fnName] = function (...args) {
+        this.call[fnName] = (...args) => {
             let promises = [];
-            for (const remote in this.remotes)
-              if (remote[fnName] != null){ // store promises as [uuid : function, ...]
-                let p = {};
-                p[remote.uuid] = remote[fnName].rpcs[fnName](...args);
-                promises.push(p);
+            let rems = [];
+            for (const remote in this.remotes){
+              if (this.remotes[remote].rpcs[fnName] != null){ // store promises as [uuid : function, ...]
+                rems.push(remote);
+                promises.push(this.remotes[remote].rpcs[fnName](...args));
               }
-            return Promise.all(promises);
+            }
+            return Promise.all(promises).then((data) => {
+              let p = {};
+              rems.forEach((v,n)=> p[v]=data[n]);
+              return p;
+            });
         }
       }
 

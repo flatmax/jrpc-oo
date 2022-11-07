@@ -1,3 +1,4 @@
+#! /usr/bin/env node
 /**
  # Copyright (c) 2016-2018 The flatmax-elements Authors. All rights reserved.
  #
@@ -33,14 +34,15 @@
 const JRPCNodeClient = require('../JRPCNodeClient').JRPCNodeClient;
 
 class TestClass {
-  uniqueFn1(){
+  uniqueFn1(i, str){
     console.log('unique1')
     console.log(arguments)
+    return i+1;
   }
 
   commonFn(){
-    console.log('unique1')
     console.log(arguments)
+    return 'Client 1';
   }
 }
 
