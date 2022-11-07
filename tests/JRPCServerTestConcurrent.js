@@ -31,7 +31,7 @@
 
 'use strict';
 
-let JRPCServer = require('./JRPCServer');
+let JRPCServer = require('../JRPCServer');
 
 /** The functions for this test class will automatically be extracted for use with jrpc*/
 class TestClass {
@@ -82,6 +82,7 @@ class TestClass {
       console.log('multiClientTest : error ')
       console.error(e)
     });
+    this.i++;
   }
 }
 
@@ -90,5 +91,5 @@ let tc = new TestClass;
 jrpcServer.addClass(tc); // setup the class for remote use over the network
 // console.log(jrpcServer)
 // throw new Error('her2')
-setTimeout(tc.multiClientTest.bind(tc), 250, jrpcServer)
+setInterval(tc.multiClientTest.bind(tc), 1000, jrpcServer)
 //tc.runMultiCall(jrpcServer);
