@@ -113,7 +113,7 @@ class JRPCCommon extends LitElement {
     // NOTE : this.server to be removed in the future.
     if (this.server) // remove the methods in the remote from the server
       if (this.remotes[uuid])
-        Object.keys(this.remotes[uuid].rpcs).forEach((fn) => delete this.server[fn]);
+        Object.keys(this.remotes[uuid].rpcs).forEach((fn) => {if (this.server[fn]) delete this.server[fn]});
 
     if (Object.keys(this.remotes).length)
       delete this.remotes[uuid];
