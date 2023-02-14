@@ -13,6 +13,8 @@ export default /** @type {import('@web/dev-server').DevServerConfig} */ ({
   hostname: "0.0.0.0",
   port: 8081,
   http2: true,
+  sslKey: './cert.client/server.key',
+  sslCert: './cert.client/server.crt',
 
   /** Compile JS for older browsers. Requires @web/dev-server-esbuild plugin */
   // esbuildTarget: 'auto'
