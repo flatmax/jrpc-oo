@@ -270,6 +270,7 @@ class JRPCCommon extends LitElement {
   */
   addClass(c, objName){
     c.getServer = () => {return this.server;} // give the class a method to get the server back to handle callbacks
+    c.getCall = () => {return this.call;} // give the class a method to get the call methods back to handle callbacks too all remotes
     let exposeClass=new ExposeClass();
     let jrpcObj=exposeClass.exposeAllFns(c, objName); // get a js-JRPC friendly function object
     if (this.classes == null)
