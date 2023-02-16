@@ -269,8 +269,10 @@ class JRPCCommon extends LitElement {
   \param objName If name is specified, then use it rather then the constructor's name to prepend the functions.
   */
   addClass(c, objName){
-    c.getServer = () => {return this.server;} // give the class a method to get the server back to handle callbacks
+    c.getRemotes = () => {return this.remotes;} // give the class a method to get the remotes
     c.getCall = () => {return this.call;} // give the class a method to get the call methods back to handle callbacks too all remotes
+    // NOTE : getServer will be removed in future
+    c.getServer = () => {return this.server;} // give the class a method to get the server back to handle callbacks
     let exposeClass=new ExposeClass();
     let jrpcObj=exposeClass.exposeAllFns(c, objName); // get a js-JRPC friendly function object
     if (this.classes == null)
