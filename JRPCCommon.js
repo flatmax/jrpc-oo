@@ -113,7 +113,8 @@ class JRPCCommon extends LitElement {
     // NOTE : this.server to be removed in the future.
     if (this.server) // remove the methods in the remote from the server
       if (this.remotes[uuid])
-        Object.keys(this.remotes[uuid].rpcs).forEach((fn) => {if (this.server[fn]) delete this.server[fn]});
+        if (this.remotes[uuid].rpcs)
+          Object.keys(this.remotes[uuid].rpcs).forEach((fn) => {if (this.server[fn]) delete this.server[fn]});
 
     if (Object.keys(this.remotes).length)
       delete this.remotes[uuid];
@@ -121,7 +122,8 @@ class JRPCCommon extends LitElement {
     if (this.call && Object.keys(this.remotes).length){
       let remainingFns = []
       for (const remote in this.remotes)
-        remainingFns = remainingFns.concat(Object.keys(this.remotes[remote].rpcs))
+        if (this.remotes[remote].rpcs)
+          remainingFns = remainingFns.concat(Object.keys(this.remotes[remote].rpcs))
       if (this.call) {
         let existingFns = Object.keys(this.call);
         for (let n=0; n<existingFns.length; n++)
