@@ -245,7 +245,7 @@ class JRPCCommon extends LitElement {
           });
         };
       } else { // some other remote already uses this fnName, error out
-        console.log(fnName+' in server, rejecting calls');
+        // console.log(fnName+' in server, rejecting calls');
         this.server[fnName] = function (params) {
           return new Promise((resolve, reject) => {
             reject(new Error('More then one remote has this RPC, not sure who to talk to : '+fnName));
