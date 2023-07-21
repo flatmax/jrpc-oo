@@ -30,7 +30,7 @@
 
 "use strict";
 
-var crypto = {};
+var crypto;
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined'){  // nodejs
   var ExposeClass = require("./ExposeClass.js");
   crypto = require('crypto');
