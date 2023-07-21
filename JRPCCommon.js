@@ -33,8 +33,6 @@
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined'){  // nodejs
   var ExposeClass = require("./ExposeClass.js");
   var crypto = require('crypto');
-  if (!crypto.randomUUID)
-    crypto.randomUUID = ()=>{return crypto.randomBytes(32).toString('base64');};
   var JRPC = require('jrpc');
   var LitElement=class {};
 } else {  // browser
@@ -43,6 +41,9 @@ if (typeof module !== 'undefined' && typeof module.exports !== 'undefined'){  //
   var ExposeClass = Window.ExposeClass;
   var LitElement = Window.LitElement; // load in the correct class for the browser
 }
+
+if (!crypto.randomUUID)
+  crypto.randomUUID = ()=>{return crypto.getRandomValues(new Uint8Array(32)).toString('base64').replaceAll(',','');};
 
 /** Call remotes in two different ways :
 To call one remote :
