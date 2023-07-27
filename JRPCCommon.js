@@ -134,12 +134,20 @@ class JRPCCommon extends LitElement {
     } else
       this.call={}; // reset the call all object
 
+    this.remoteDisconnected(uuid);
     // console.log('after')
     // console.log('this.call after')
     // console.log(this.call)
     // console.log('this.remotes')
     // console.log(this.remotes)
     // console.log(this.server)
+  }
+
+  /** Notify that a remote has been disconnected
+  @param uuid The uuid of the remote to remove
+  */
+  remoteDisconnected(uuid){
+    console.log('JPRCCommon::remoteDisconnected '+uuid);
   }
 
   /** expose classes and handle the setting up of remote's functions
