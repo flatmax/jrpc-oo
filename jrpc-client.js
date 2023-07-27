@@ -104,7 +104,7 @@ export class JRPCClient extends JRPCCommon {
     return this.server != null && this.server != {};
   }
 
-  /** This function is called once websocket refused / get error
+  /** This function is called if the websocket is refused or gets an error
   */
   setupSkip() {
     this.dispatchEvent(new CustomEvent('skip'))
