@@ -9,6 +9,12 @@ First install the requirements :
 npm install
 ```
 
+## setup the nodejs side
+
+```
+./JRPCServerTest.js
+```
+
 ## setup the webapp
 
 To setup run the webapp (answer defaults to the key generation question) :
@@ -18,12 +24,6 @@ npm start
 Now clear cert issues in the browser go to the following url to clear the websocket port 9000 : https://0.0.0.0:9000
 
 Now finally run the demo in the webapp : https://0.0.0.0:8081
-
-## setup the nodejs side
-
-```
-./JRPCServerTest.js
-```
 
 ## in the webapp
 
