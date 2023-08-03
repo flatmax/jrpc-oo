@@ -85,8 +85,6 @@ export class JRPCClient extends JRPCCommon {
       this.ws.addEventListener('error', this.wsError.bind(this));
     } catch (e) {
       this.serverURI = "";
-      if (e.message && e.message.indexOf("Failed to construct 'WebSocket'") >= 0)
-        alert (e.message)
       this.setupSkip(e)
     }
   }
