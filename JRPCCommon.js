@@ -296,6 +296,17 @@ class JRPCCommon extends LitElement {
         remote.expose(jrpcObj); // expose the functions from the class
         remote.upgrade();  // Handshake extended capabilities
       }
+
+      // auto defining getters needs more work
+      // if (!('remotes' in c))
+      //   Object.defineProperty(c, 'remotes', {
+      //     get() {return c.getRemotes();}
+      //   });
+      // if (!('call' in c))
+      //   Object.defineProperty(c, 'call', {  // add a getter for the call local member variable
+      //     get() {return c.getCall();},
+      //     enumerable: true
+      //   });
   }
 }
 
