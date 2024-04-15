@@ -20,7 +20,7 @@ class TestClass {
   }
 }
 
-let tc=new TestClass; // this class will be used over js-JRPC
+let tc=new TestClass; // this class will be executed over the network using JRPC2
 
 // start the server and add the class.
 var JrpcServer=new JRPCServer.JRPCServer(9000); // start a server on port 9000
