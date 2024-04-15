@@ -3,7 +3,7 @@ jrpc-oo Expose objects over the network using the JSON-RPC 2.0 protocol.
 Using the objects and webcompoenents, you can have two entities linked by a web-socket execute eachother over the network using the JSON-RPC 2.0 protocol. This could be a browser and nodejs, or two browsers.
 
 # Example
-On one side of the network create a server. For example in nodejs :
+On one side of the network create a server listening on port 9000. For example in nodejs :
 ```
 JRPCServer = require('./JRPCServer');
 
@@ -27,7 +27,7 @@ var JrpcServer=new JRPCServer.JRPCServer(9000); // start a server on port 9000
 JrpcServer.addClass(tc); // setup the class for remote use over the network
 ```
 
-On the other side of the network create a client. For example, in the browser :
+On the other side of the network create a client which connects to port 9000. For example, in the browser :
 ```
 import {JRPCClient} from '../jrpc-client.js';
 import '@material/mwc-button';
