@@ -41,8 +41,8 @@ export class LocalJRPC extends JRPCClient {
     this.serverURI="wss://0.0.0.0:9000";
   }
 
-  /** server variable is ready to use.
-  Create a button for each for the function call
+  /** setupDone is called once connected and the server is ready to use.
+  Create a button for each for the function call.
   */
   setupDone() {
     // add a button to test argument passing
@@ -53,7 +53,7 @@ export class LocalJRPC extends JRPCClient {
     this.shadowRoot.appendChild(btn);
   }
 
-  /** Call class TestClass method fn2 here. This method test passing arguments to the server.
+  /** Call class TestClass method fn2 here. This method tests passing arguments to the server.
   */
   testArgPass() {
     this.call['TestClass.fn2'](1, {0: 'test', 1: [ 1 ,2], 2: 'this function'})
