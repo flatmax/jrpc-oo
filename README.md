@@ -1,6 +1,6 @@
 jrpc-oo Expose objects over the network using the JSON-RPC 2.0 protocol.
 
-Using the objects and webcompoenents, you can have two entities linked by a web-socket execute eachother over the network using the JSON-RPC 2.0 protocol. This could be a browser and nodejs, or two browsers.
+Using the objects and webcompoenents, you can have two entities linked by a web-socket execute eachother over the network using the JSON-RPC 2.0 protocol. This could be a browser and nodejs, many browsers or many nodejs instances.
 
 # Example
 On one side of the network create a server listening on port 9000. Then add a TestClass to the JRPCServer. For example in nodejs :
