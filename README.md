@@ -2,6 +2,65 @@ jrpc-oo Expose objects over the network using the JSON-RPC 2.0 protocol.
 
 Using the objects and webcompoenents, you can have two entities linked by a web-socket execute eachother over the network using the JSON-RPC 2.0 protocol. This could be a browser and nodejs, or two browsers.
 
+# Example
+On one side of the network create a server. For example in nodejs :
+```
+JRPCServer = require('./JRPCServer');
+
+/** The functions for this test class will automatically be extracted for use with jrpc*/
+class TestClass {
+  fn2(arg1, arg2){
+    console.log('fn2');
+    console.log('arg1 :');
+    console.log(JSON.stringify(arg1, null, 2))
+    console.log('');
+    console.log('arg2 :');
+    console.log(JSON.stringify(arg2, null, 2))
+    return arg1;
+  }
+}
+
+let tc=new TestClass; // this class will be used over js-JRPC
+
+// start the server and add the class.
+var JrpcServer=new JRPCServer.JRPCServer(9000); // start a server on port 9000
+JrpcServer.addClass(tc); // setup the class for remote use over the network
+```
+
+On the other side of the network create a client. For example, in the browser :
+```
+import {JRPCClient} from '../jrpc-client.js';
+import '@material/mwc-button';
+
+/** This class inherits from JrpcClient.
+*/
+export class LocalJRPC extends JRPCClient {
+  /** server variable is ready to use.
+  Create a button for each for the function call
+  */
+  setupDone() {
+    // add a button to test argument passing
+    let btn=document.createElement('mwc-button');
+    btn.raised=true; btn.elevation=10;
+    btn.onclick=this.testArgPass;
+    btn.textContent='TestClass.fn2 arg test';
+    this.shadowRoot.appendChild(btn);
+  }
+
+  /** Call class TestClass method fn2 here. This method test passing arguments to the server.
+  */
+  testArgPass() {
+    this.call['TestClass.fn2'](1, {0: 'test', 1: [ 1 ,2], 2: 'this function'})
+    .then((result)=>{
+      console.log(result);
+    })
+    .catch((e)=>{console.error(e.message)});
+  }
+}
+
+window.customElements.define('local-jrpc', LocalJRPC);
+```
+
 # run the webapp demo :
 
 First install the requirements :
