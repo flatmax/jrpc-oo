@@ -35,6 +35,12 @@ import '@material/mwc-button';
 /** This class inherits from JrpcClient.
 */
 export class LocalJRPC extends JRPCClient {
+  /** Once the webcomponent is ready, connect to the server on port 9000
+  */
+  firstUpdated() {
+    this.serverURI="wss://0.0.0.0:9000";
+  }
+
   /** server variable is ready to use.
   Create a button for each for the function call
   */
