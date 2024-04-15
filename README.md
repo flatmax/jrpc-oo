@@ -4,7 +4,7 @@ Using the objects and webcompoenents, you can have two entities linked by a web-
 
 # Example
 On one side of the network create a server listening on port 9000. Then add a TestClass to the JRPCServer. For example in nodejs :
-```
+```javascript
 JRPCServer = require('./JRPCServer');
 
 /** The functions for this test class will automatically be extracted for use with jrpc*/
@@ -28,7 +28,7 @@ JrpcServer.addClass(tc); // setup the class for remote use over the network
 ```
 
 On the other side of the network create a client which auto-connects to port 9000. In the browser, create a button which calls TestClass::fn2 on the server. Here is example code for the browser  :
-```
+```javascript
 import {JRPCClient} from '../jrpc-client.js';
 import '@material/mwc-button';
 
