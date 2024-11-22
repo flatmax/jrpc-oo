@@ -124,8 +124,12 @@ class Calculator:
     def add(self, a, b):
         return {"result": a + b}
 
+# Create the instance that will be resident on the server
+calculator = Calculator()
+
+# Create server and add the calculator instance
 server = JRPCServer(host='localhost', port=8080)
-server.add_instance(Calculator())
+server.add_instance(calculator)
 server.start()
 
 # Client
