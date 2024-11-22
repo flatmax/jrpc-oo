@@ -1,71 +1,147 @@
-jrpc-oo Expose objects over the network using the JSON-RPC 2.0 protocol.
+# jrpc-oo
 
-Using the objects and webcompoenents, you can have two entities linked by a web-socket execute eachother over the network using the JSON-RPC 2.0 protocol. This could be a browser and nodejs, many browsers or many nodejs instances.
+Expose objects over the network using the JSON-RPC 2.0 protocol. This repository provides implementations in Node.js, LitElement (Web Components), and Python, allowing seamless RPC communication between different platforms.
 
-# Example
-On one side of the network create a server listening on port 9000. Then add a TestClass to the JRPCServer. For example in nodejs :
+## Features
+
+- JSON-RPC 2.0 protocol implementation
+- WebSocket-based communication
+- Multiple language support:
+  - Node.js server and client
+  - LitElement web components for browser integration
+  - Python server and client
+- Automatic function exposure and remote execution
+- Secure WebSocket support (WSS)
+- Bidirectional communication
+
+## Implementations
+
+### Node.js
+- Server implementation in `JRPCServer.js`
+- Client implementation in `JRPCNodeClient.js`
+- Support for automatic class method exposure
+- WebSocket-based communication
+
+### LitElement (Web Components)
+- Browser-based client implementation in `jrpc-client.js`
+- Material Design components integration
+- Automatic UI generation for exposed methods
+- WebSocket client capabilities
+
+### Python
+- Server implementation in `python/jrpc_server.py`
+- Client implementation in `python/jrpc_client.py`
+- Compatible with Node.js and browser clients
+- Async/await support using websockets
+
+## Example Usage
+
+### Node.js Server Example
 ```javascript
 JRPCServer = require('./JRPCServer');
 
-/** The functions for this test class will automatically be extracted for use with jrpc*/
 class TestClass {
   fn2(arg1, arg2){
     console.log('fn2');
-    console.log('arg1 :');
-    console.log(JSON.stringify(arg1, null, 2))
-    console.log('');
-    console.log('arg2 :');
-    console.log(JSON.stringify(arg2, null, 2))
+    console.log('arg1 :', JSON.stringify(arg1, null, 2));
+    console.log('arg2 :', JSON.stringify(arg2, null, 2));
     return arg1;
   }
 }
 
-let tc=new TestClass; // this class will be executed over the network using JRPC2
-
-// start the server and add the class.
-var JrpcServer=new JRPCServer.JRPCServer(9000); // start a server on port 9000
-JrpcServer.addClass(tc); // setup the class for remote use over the network
+let tc = new TestClass;
+var JrpcServer = new JRPCServer.JRPCServer(9000); // start a server on port 9000
+JrpcServer.addClass(tc); // setup the class for remote use
 ```
 
-On the other side of the network create a client which auto-connects to port 9000. In the browser, create a button which calls TestClass::fn2 on the server. Here is example code for the browser  :
+### Browser Client Example (LitElement)
 ```javascript
 import {JRPCClient} from '../jrpc-client.js';
 import '@material/mwc-button';
 
-/** This class inherits from JrpcClient.
-*/
 export class LocalJRPC extends JRPCClient {
-  /** Once the webcomponent is ready, connect to the server on port 9000
-  */
   firstUpdated() {
-    this.serverURI="wss://0.0.0.0:9000";
+    this.serverURI = "wss://0.0.0.0:9000";
   }
 
-  /** setupDone is called once connected and the server is ready to use.
-  Create a button for each for the function call.
-  */
   setupDone() {
-    // add a button to test argument passing
-    let btn=document.createElement('mwc-button');
-    btn.raised=true; btn.elevation=10;
-    btn.onclick=this.testArgPass;
-    btn.textContent='TestClass.fn2 arg test';
+    let btn = document.createElement('mwc-button');
+    btn.raised = true;
+    btn.onclick = this.testArgPass;
+    btn.textContent = 'TestClass.fn2 arg test';
     this.shadowRoot.appendChild(btn);
   }
 
-  /** Call class TestClass method fn2 here. This method tests passing arguments to the server.
-  */
   testArgPass() {
-    this.call['TestClass.fn2'](1, {0: 'test', 1: [ 1 ,2], 2: 'this function'})
-    .then((result)=>{
-      console.log(result);
-    })
-    .catch((e)=>{console.error(e.message)});
+    this.call['TestClass.fn2'](1, {0: 'test', 1: [1, 2]})
+      .then((result) => console.log(result))
+      .catch((e) => console.error(e.message));
   }
 }
 
 window.customElements.define('local-jrpc', LocalJRPC);
 ```
+
+### Python Example
+```python
+# Server
+from python.jrpc_server import JRPCServer
+
+class Calculator:
+    def add(self, a, b):
+        return {"result": a + b}
+
+server = JRPCServer(host='localhost', port=8080)
+server.add_instance(Calculator())
+server.start()
+
+# Client
+from python.jrpc_client import JRPCClient
+
+client = JRPCClient('ws://localhost:8080')
+result = await client.call('Calculator.add', 1, 2)
+print(result)  # {"result": 3}
+```
+
+## Getting Started
+
+1. Install dependencies:
+   ```bash
+   npm install  # For Node.js/Browser
+   pip install -r python/requirements.txt  # For Python
+   ```
+
+2. Start the server:
+   ```bash
+   # Node.js server
+   ./JRPCServerTest.js
+   
+   # OR Python server
+   python python/server.py
+   ```
+
+3. For web application demo:
+   ```bash
+   npm start
+   ```
+   Then:
+   - Clear cert issues: visit https://0.0.0.0:9000
+   - Access demo: https://0.0.0.0:8081
+
+## Integration
+
+- See the jrpc-lit-node repo for Node.js/LitElement integration examples
+- Python implementation can be integrated directly into any async Python application
+
+## Security
+
+- Uses WSS (WebSocket Secure) for encrypted communication
+- Certificate generation scripts included in repository
+- Proper error handling and input validation
+
+## License
+
+See LICENSE file for details.
 
 # run the webapp demo :
 
@@ -112,5 +188,3 @@ npm install
 
 ```
 ./tests/multiTest.sh
-
-```
