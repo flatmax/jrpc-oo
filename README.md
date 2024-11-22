@@ -2,6 +2,22 @@
 
 Expose objects over the network using the JSON-RPC 2.0 protocol. This repository provides implementations in Node.js, LitElement (Web Components), and Python, allowing seamless RPC communication between different platforms.
 
+## Table of Contents
+- [Features](#features)
+- [Implementations](#implementations)
+  - [Node.js](#nodejs)
+  - [LitElement (Web Components)](#litelement-web-components)
+  - [Python](#python)
+- [RPC Calling Pattern](#rpc-calling-pattern)
+- [Example Usage](#example-usage)
+  - [Node.js Server Example](#nodejs-server-example)
+  - [Browser Client Example](#browser-client-example-litelement)
+  - [Python Example](#python-example)
+- [Getting Started](#getting-started)
+- [Integration](#integration)
+- [Security](#security)
+- [License](#license)
+
 ## Features
 
 - JSON-RPC 2.0 protocol implementation
@@ -225,5 +241,3 @@ npm install
 
 ```
 ./tests/multiTest.sh
-
-```
