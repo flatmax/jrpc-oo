@@ -132,7 +132,7 @@ server.start()
 from python.jrpc_client import JRPCClient
 
 client = JRPCClient('ws://localhost:8080')
-result = await client.call('Calculator.add', 1, 2)
+result = await client['Calculator.add'](1, 2)
 print(result)  # {"result": 3}
 ```
 
@@ -221,3 +221,5 @@ npm install
 
 ```
 ./tests/multiTest.sh
+
+```
