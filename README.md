@@ -6,6 +6,10 @@ Expose objects over the network using the JSON-RPC 2.0 protocol. This repository
 
 - JSON-RPC 2.0 protocol implementation
 - WebSocket-based communication
+- Bidirectional RPC calls:
+  - Server can call client methods
+  - Client can call server methods
+  - Enables true peer-to-peer communication
 - Multiple language support:
   - Node.js server and client
   - LitElement web components for browser integration
@@ -33,6 +37,34 @@ Expose objects over the network using the JSON-RPC 2.0 protocol. This repository
 - Client implementation in `python/jrpc_client.py`
 - Compatible with Node.js and browser clients
 - Async/await support using websockets
+
+## RPC Calling Pattern
+
+All implementations (Node.js, Python, and Browser) use the same consistent pattern for making RPC calls:
+
+```javascript
+// Standard RPC calling pattern
+jrpcObject['ClassName.methodName'](arg1, arg2, ...)
+
+// Examples:
+// JavaScript/Browser
+client['Calculator.add'](2, 3)
+  .then(result => console.log(result))
+  .catch(error => console.error(error));
+
+// Python (with async/await)
+result = await client['Calculator.add'](2, 3)
+
+// Node.js
+client['TestClass.fn2'](arg1, arg2)
+  .then(result => console.log(result))
+  .catch(error => console.error(error));
+```
+
+This consistent pattern ensures that RPC calls work the same way across all implementations, making it easier to:
+- Switch between different implementations
+- Write cross-platform code
+- Understand and maintain the codebase
 
 ## Example Usage
 
