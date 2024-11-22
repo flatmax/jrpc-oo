@@ -89,6 +89,7 @@ JrpcServer.addClass(tc); // setup the class for remote use
 ### Browser Client Example (LitElement)
 ```javascript
 import {JRPCClient} from '../jrpc-client.js';
+import {html} from 'lit';
 import '@material/mwc-button';
 
 export class LocalJRPC extends JRPCClient {
@@ -96,12 +97,12 @@ export class LocalJRPC extends JRPCClient {
     this.serverURI = "wss://0.0.0.0:9000";
   }
 
-  setupDone() {
-    let btn = document.createElement('mwc-button');
-    btn.raised = true;
-    btn.onclick = this.testArgPass;
-    btn.textContent = 'TestClass.fn2 arg test';
-    this.shadowRoot.appendChild(btn);
+  render() {
+    return html`
+      <mwc-button raised
+        @click=${this.testArgPass}
+        >TestClass.fn2 arg test</mwc-button>
+    `;
   }
 
   testArgPass() {
