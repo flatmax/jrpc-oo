@@ -3,107 +3,43 @@
 JSON-RPC 2.0 Server implementation with WebSocket support and class-based RPC
 """
 import json
-import inspect
-import asyncio
 import websockets
-import traceback
+from jrpc_common import JRPCCommon
 
-
-class JRPCServer:
+class JRPCServer(JRPCCommon):
     def __init__(self, host='localhost', port=8080):
         """Initialize WebSocket RPC server"""
+        super().__init__()
         self.host = host
         self.port = port
-        self.instances = {}
-        self._system_methods = {
-            'system.listComponents': self.list_components
-        }
-
-    def list_components(self):
-        """List all registered components and their methods
-        This is called by jrpc-oo's setupRemote to discover available instances and methods
-        Returns a dictionary of method names in the format {class_name.method_name: True}
-        """
-        components = {}
-        for class_name, instance in self.instances.items():
-            for name, method in inspect.getmembers(instance, inspect.ismethod):
-                if not name.startswith('_'):
-                    method_name = f"{class_name}.{name}"
-                    components[method_name] = True
-        return components
-
-    def register_instance(self, instance, class_name=None):
-        """Register a class instance for RPC access"""
-        if class_name is None:
-            class_name = instance.__class__.__name__
-        self.instances[class_name] = instance
-
-    async def _handle_ws_message(self, websocket, message):
-        """Handle incoming WebSocket message"""
-        try:
-            # Parse message as JSON-RPC
-            parsed = json.loads(message)
-
-            # Get method name and parameters
-            method_name = parsed.get('method')
-            params = parsed.get('params', {})
-            
-            # Extract args from params if present
-            if isinstance(params, dict) and 'args' in params:
-                args = params['args']
-            else:
-                args = params if isinstance(params, list) else [params]
-
-            # Handle system methods first
-            if method_name in self._system_methods:
-                result = self._system_methods[method_name]()
-                response = json.dumps({
-                    'jsonrpc': '2.0',
-                    'result': result,
-                    'id': parsed.get('id')
-                })
-            # Handle instance methods
-            elif '.' in method_name:
-                class_name, method = method_name.split('.')
-                instance = self.instances.get(class_name)
-                if instance and hasattr(instance, method):
-                    method_obj = getattr(instance, method)
-                    result = await asyncio.get_event_loop().run_in_executor(None, method_obj, *args)
-                    response = json.dumps({
-                        'jsonrpc': '2.0',
-                        'result': result,
-                        'id': parsed.get('id')
-                    })
-                else:
-                    response = json.dumps({
-                        'jsonrpc': '2.0',
-                        'error': {'code': -32601, 'message': f'Method {method_name} not found'},
-                        'id': parsed.get('id')
-                    })
-            else:
-                response = json.dumps({
-                    'jsonrpc': '2.0',
-                    'error': {'code': -32601, 'message': f'Invalid method name format: {method_name}'},
-                    'id': parsed.get('id')
-                })
-
-            await websocket.send(response)
-
-        except Exception as e:
-            error_response = json.dumps({
-                'jsonrpc': '2.0',
-                'error': {'code': -32603, 'message': str(e)},
-                'id': parsed.get('id') if 'parsed' in locals() else None
-            })
-            await websocket.send(error_response)
 
     async def _handle_ws_connection(self, websocket):
         """Handle WebSocket connection"""
+        remote_id = id(websocket)
+        print(f"DEBUG: New connection from {websocket.remote_address}, ID: {remote_id}")
+        self.remotes[remote_id] = websocket
+        
         try:
             async for message in websocket:
-                await self._handle_ws_message(websocket, message)
+                print(f"DEBUG: Received message from {remote_id}: {message[:100]}...")
+                try:
+                    parsed = json.loads(message)
+                    # Only handle messages with method calls
+                    if 'method' in parsed:
+                        response = await self.handle_message(websocket, message)
+                        if response:
+                            print(f"DEBUG: Sending response to {remote_id}: {response[:100]}...")
+                            await websocket.send(response)
+                except json.JSONDecodeError:
+                    print(f"DEBUG: Invalid JSON received: {message}")
         except websockets.exceptions.ConnectionClosed:
-            pass
+            print(f"DEBUG: Connection closed for {remote_id}")
+            del self.remotes[remote_id]
+        except Exception as e:
+            print(f"DEBUG: Error handling connection {remote_id}: {e}")
+            print(f"DEBUG: Error type: {type(e)}")
+            import traceback
+            print(f"DEBUG: Traceback:\n{traceback.format_exc()}")
 
     async def start(self):
         """Start the WebSocket server"""
