@@ -2,3 +2,5 @@
 cert*
 node_modules
 package-lock.json
+.aider*
+.env
