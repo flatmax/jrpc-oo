@@ -1,31 +1,26 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
+import replace from '@rollup/plugin-replace';
 
 export default {
   input: 'jrpc-client.js',
   output: {
     file: 'dist/bundle.js',
     format: 'es',
-    inlineDynamicImports: true
+    inlineDynamicImports: true,
+    exports: 'named'
   },
   plugins: [
     resolve({
       browser: true,
-      preferBuiltins: true,
+      preferBuiltins: false,
       mainFields: ['browser', 'module', 'main'],
-      moduleDirectories: ['node_modules'],
-      resolveOnly: [
-        'jrpc/jrpc.min.js',
-        'lit'
-      ]
+      dedupe: ['jrpc'], // Explicitly include jrpc
     }),
-    commonjs({
-      transformMixedEsModules: true,
-      ignore: ['crypto', 'timers'],
-      include: [
-        'node_modules/**',
-        'node_modules/jrpc/jrpc.min.js'
-      ]
-    })
+    replace({
+      'require("crypto")': '({})', // Replace with an empty object
+      'require("timers")': '({})', // Replace with an empty object
+      preventAssignment: true, // Important to avoid accidental assignments
+    }),
   ]
 };
