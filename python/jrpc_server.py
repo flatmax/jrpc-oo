@@ -76,61 +76,8 @@ class JRPCServer(JRPCCommon):
     async def process_message(self, message):
         """Process incoming JSON-RPC message"""
         try:
-            # Validate JSON-RPC message structure
-            if 'jsonrpc' not in message or message['jsonrpc'] != '2.0':
-                return {
-                    'jsonrpc': '2.0',
-                    'error': {'code': -32600, 'message': 'Invalid Request'},
-                    'id': message.get('id')
-                }
-
-            method_name = message.get('method')
-            params = message.get('params', {})
-            msg_id = message.get('id')
-
-            if not method_name:
-                return {
-                    'jsonrpc': '2.0',
-                    'error': {'code': -32600, 'message': 'Method not specified'},
-                    'id': msg_id
-                }
-
-            # Handle system.listComponents
-            if method_name == 'system.listComponents':
-                result = self.list_components()
-                return {
-                    'jsonrpc': '2.0',
-                    'result': result,
-                    'id': msg_id
-                }
-
-            # Find and call the appropriate method
-            for class_name, instance in self.instances.items():
-                if method_name.startswith(class_name + '.'):
-                    method = getattr(instance, method_name.split('.')[-1], None)
-                    if callable(method):
-                        # Handle wrapped args parameter format from JS client
-                        if isinstance(params, dict) and 'args' in params:
-                            if isinstance(params['args'], list):
-                                result = await method(*params['args'])
-                            else:
-                                result = await method(params['args'])
-                        elif isinstance(params, dict):
-                            result = await method(**params)
-                        else:
-                            result = await method(*params)
-                        return {
-                            'jsonrpc': '2.0',
-                            'result': result,
-                            'id': msg_id
-                        }
-
-            return {
-                'jsonrpc': '2.0',
-                'error': {'code': -32601, 'message': f'Method {method_name} not found'},
-                'id': msg_id
-            }
-
+            # Handle the message using common handler
+            return await self.handle_message(message)
         except Exception as e:
             return {
                 'jsonrpc': '2.0',

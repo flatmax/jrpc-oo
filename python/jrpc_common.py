@@ -74,7 +74,13 @@ class JRPCCommon:
                     if hasattr(instance, method_name):
                         method_func = getattr(instance, method_name)
                         if callable(method_func):
-                            if isinstance(params, dict):
+                            # Handle wrapped args parameter format from JS client
+                            if isinstance(params, dict) and 'args' in params:
+                                if isinstance(params['args'], list):
+                                    result = await method_func(*params['args'])
+                                else:
+                                    result = await method_func(params['args'])
+                            elif isinstance(params, dict):
                                 result = await method_func(**params)
                             else:
                                 result = await method_func(*params)
