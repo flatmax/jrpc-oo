@@ -32,5 +32,6 @@ if __name__ == "__main__":
     print("Test 1 - Starting Calculator Server on port 8080...")
     try:
         server.start()
+        server.serve_forever()
     except KeyboardInterrupt:
         print("\nShutting down calculator server...")

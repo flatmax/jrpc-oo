@@ -18,7 +18,8 @@ class JRPCCommon:
         if debug:
             handler = logging.StreamHandler(sys.stdout)
             handler.setFormatter(logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+                '%(asctime)s.%(msecs)06d - %(name)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
             ))
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.DEBUG)
@@ -35,6 +36,10 @@ class JRPCCommon:
         if class_name is None:
             class_name = instance.__class__.__name__
         self.instances[class_name] = instance
+        # Give the instance access to our client connection if it needs it
+        if hasattr(instance, 'client'):
+            instance.client = self.client
+            self.logger.debug(f"Set client connection for instance {class_name}")
         
 
     def list_components(self):

@@ -9,7 +9,7 @@ def run_calculator_tests():
     client = JRPCClient(port=8080)
     
     try:
-        if client.connect():
+        if client.connect_to_server():
             calc = client['Calculator']
             
             print("\nRunning Calculator Tests:")

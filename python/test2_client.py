@@ -13,39 +13,46 @@ class Display:
     def show(self, text):
         """Handle incoming server messages"""
         self.messages.append(text)
-        print(f"\nClient received message: '{text}'")
+        print(f"\nClient [{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}] received message: '{text}'")
         return True
 
 def run_notification_test():
-    client = JRPCClient(port=8082)
+    client = JRPCClient(port=8082, debug=True)
     display = Display()
     
     try:
-        # Register display for callbacks
+        # Register display for callbacks and start client server first
         client.register_instance(display)
-        
-        if client.connect():
+        if not client.start_server():
+            print("Failed to start client server")
+            return
+            
+        # Now connect to main server
+        if client.connect_to_server():
             notifier = client['NotificationServer']
             
             print("\nStarting Notification Test:")
             print("-" * 30)
             
-            # Tell server to start sending notifications
-            success = notifier.start_notifications()
-            
-            if success:
-                # Wait for all messages
-                time.sleep(4)
+            print(f"\nClient [{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}]: Attempting to register with server...")
+            try:
+                success = notifier.register_client(client.client_port)
+                print(f"Client [{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}]: Registration call returned: {success}")
                 
-                # Verify we got all messages
-                assert len(display.messages) == 3, \
-                    f"Expected 3 messages, got {len(display.messages)}"
-                print("\nNotification test passed!")
-            else:
-                print("Server failed to start notifications")
-                
-    except Exception as e:
-        print(f"Test error: {str(e)}")
+                if success:
+                    print(f"Client [{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}]: Successfully registered, waiting for notifications...")
+                    # Wait for all messages
+                    time.sleep(4)
+                    
+                    # Verify we got all messages
+                    assert len(display.messages) == 3, \
+                        f"Expected 3 messages, got {len(display.messages)}"
+                    print("\nNotification test passed!")
+                else:
+                    print("Failed to register with server")
+                    
+            except Exception as e:
+                print(f"Test error: {str(e)}")
     finally:
         client.close()
 

@@ -8,32 +8,21 @@ import logging
 from jrpc_common import JRPCCommon
 
 class JRPCServer(JRPCCommon):
-    def __init__(self, host='localhost', port=8080, client_port=8081, debug=False):
-        """Initialize JSON-RPC server with bidirectional capabilities
+    def __init__(self, host='localhost', port=8080, debug=False):
+        """Initialize JSON-RPC server
         
         Args:
             host: Host to bind to
             port: Port for server to listen on
-            client_port: Port to connect back to clients
         """
         super().__init__(debug)
         self.host = host
         self.port = port
-        self.client_port = client_port
 
     def start(self):
-        """Start the JSON-RPC server and connect back to client"""
-        # Start server
+        """Start the JSON-RPC server without connecting to client"""
         self.server = SimpleJSONRPCServer((self.host, self.port))
         self.logger.debug(f"Server started on {self.host}:{self.port}")
-        
-        # Create client connection back to client
-        try:
-            self.client = Server(f'http://{self.host}:{self.client_port}')
-            self.logger.info(f"Connected back to client on port {self.client_port}")
-        except Exception as e:
-            self.logger.error(f"Failed to connect back to client: {e}")
-            self.client = None
         
         # Register all instance methods
         for class_name, instance in self.instances.items():
@@ -49,6 +38,8 @@ class JRPCServer(JRPCCommon):
         # Register system methods
         self.server.register_function(self.list_components, 'system.listComponents')
         
+    def serve_forever(self):
+        """Start serving requests forever"""
         try:
             self.server.serve_forever()
         except KeyboardInterrupt:
