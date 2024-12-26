@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
+
+    <title>jrpc-client demo (no WSS)</title>
+
+    <script type="module">
+      import './local-jrpc.js'
+      console.log('no_wss')
+    </script>
+  </head>
+  <body>
+    <h3>jrpc-client demo (no WSS)</h3>
+    <local-jrpc></local-jrpc>
+    <script>
+      var je = document.querySelector('local-jrpc');
+      je.serverURI="ws://0.0.0.0:9000";
+    window.addEventListener('JRPCClientFound', d => {
+      var je = document.querySelector('local-jrpc');
+      je.serverURI=d.detail;
+    });
+    </script>
+  </body>
+</html>

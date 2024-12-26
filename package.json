@@ -6,6 +6,7 @@
   "scripts": {
     "start": "./JRPCServerTest.sh",
     "start:dist": "./JRPCServerTest-dist.sh",
+    "start:no_wss": "./JRPCServerTest.sh no_wss",
     "build": "rollup -c"
   },
   "devDependencies": {

@@ -9,20 +9,20 @@ class Calculator:
     def __init__(self):
         self.operations = []
         
-    def add(self, a, b):
+    async def add(self, a, b):
         result = a + b
         return result
 
-    def subtract(self, a, b):
+    async def subtract(self, a, b):
         result = a - b
         return result
 
-    def multiply(self, a, b):
+    async def multiply(self, a, b):
         result = a * b
         return result
 
 if __name__ == "__main__":    
-    server = JRPCServer(port=8080)
+    server = JRPCServer(port=8080, debug=False)
     calc = Calculator()
     server.add_class(calc)
     

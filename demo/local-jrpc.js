@@ -39,6 +39,7 @@ export class LocalJRPC extends JRPCClient {
   constructor() {
     super();
     this.remoteTimeout = 300;
+    this.debug = false;
   }
 
   /** server variable is ready to use.
@@ -90,13 +91,15 @@ export class LocalJRPC extends JRPCClient {
   */
   testArgPass() {
     var lj = document.querySelector('local-jrpc');
-    if (lj.server['TestClass.fn2']!=null)
+    if (lj.server['TestClass.fn2']!=null){
+      console.log('>>> Sending request to TestClass.fn2:');
+      console.log('Arguments:', [1, {0: 'test', 1: [ 1 ,2], 2: 'this function'}]);
       lj.server['TestClass.fn2'](1, {0: 'test', 1: [ 1 ,2], 2: 'this function'})
       .then((result)=>{
-        console.log(result);
+        console.log('<<< Received response:', result);
       })
       .catch((e)=>{console.error(e.message)});
-    else
+    } else
       console.log('expected the server to expose a class TestClass with function fn2 but couldn\'t find it');
   }
 
@@ -120,6 +123,7 @@ export class LocalJRPC extends JRPCClient {
 
   echoBack(args){
     console.log('echoBack '+args)
+    console.log(this.server)
     if (this.server['TestClass.echoBack']!=null)
       this.server['TestClass.echoBack']('this is the browser saying echo')
       .then((args)=> {

@@ -3,7 +3,7 @@
 Test 2: Server-to-Client RPC test client
 """
 from jrpc_client import JRPCClient
-import time
+import asyncio
 
 class Display:
     """Display class that receives server notifications"""
@@ -16,19 +16,14 @@ class Display:
         print(f"\nClient received message: '{text}'")
         return True
 
-def run_notification_test():
-    client = JRPCClient(port=8082, debug=True)
+async def run_notification_test():
+    client = JRPCClient(port=8082, debug=False)
     display = Display()
     
     try:
-        # Register display for callbacks and start client server first
-        client.add_class(display)
-        if not client.start_server():
-            print("Failed to start client server")
-            return
-            
-        # Now connect to main server
-        if client.connect_to_server():
+        # Connect to server and register display for callbacks
+        if await client.connect():
+            client.add_class(display)
             notifier = client['NotificationServer']
             
             print("\nStarting Notification Test:")
@@ -36,13 +31,13 @@ def run_notification_test():
             
             print("\nClient: Attempting to register with server...")
             try:
-                success = notifier.register_client(client.client_port)
+                success = await notifier.register_client(None)
                 print(f"Client: Registration call returned: {success}")
                 
                 if success:
                     print("Client: Successfully registered, waiting for notifications...")
                     # Wait for all messages
-                    time.sleep(4)
+                    await asyncio.sleep(4)
                     
                     # Verify we got all messages
                     assert len(display.messages) == 3, \
@@ -54,8 +49,8 @@ def run_notification_test():
             except Exception as e:
                 print(f"Test error: {str(e)}")
     finally:
-        client.close()
+        await client.close()
 
 if __name__ == "__main__":
     print("Test 2 - Starting Notification Client...")
-    run_notification_test()
+    asyncio.run(run_notification_test())

@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+
+# Check if no_wss argument is provided
+USE_WSS=true
+if [ "$1" = "no_wss" ]; then
+  USE_WSS=false
+fi
+
 function certConfig() {
 echo "
 # --- no modifications required below ---
@@ -23,24 +30,34 @@ CN = buildroot.deqxbox
 subjectAltName = DNS:buildroot.deqxbox" > ./cert/server.cnf
 }
 
-if [ ! -d cert.client ]; then
-  rm -rf cert.client; mkdir -p cert.client
-  certConfig
-  openssl req -new -nodes -x509 -days 3650 -config ./cert/server.cnf -keyout ./cert.client/server.key -out ./cert.client/server.crt
-  chmod 600 ./cert.client/server.key
-fi
-if [ ! -d cert.server ]; then
-  rm -rf cert.server; mkdir -p cert.server; ln -s cert.server cert
-  openssl req -newkey rsa:2048 -new -nodes -x509 -days 365 -keyout cert.server/server.key -out cert.server/server.crt
-fi
+if [ "$USE_WSS" = true ]; then
+  if [ ! -d cert.client ]; then
+    rm -rf cert.client; mkdir -p cert.client
+    certConfig
+    openssl req -new -nodes -x509 -days 3650 -config ./cert/server.cnf -keyout ./cert.client/server.key -out ./cert.client/server.crt
+    chmod 600 ./cert.client/server.key
+  fi
+  if [ ! -d cert.server ]; then
+    rm -rf cert.server; mkdir -p cert.server; ln -s cert.server cert
+    openssl req -newkey rsa:2048 -new -nodes -x509 -days 365 -keyout cert.server/server.key -out cert.server/server.crt
+  fi
 
-echo
-echo Don\'t forget to run ./JRPCTServerTest.js
-echo Don\'t forget to open https://0.0.0.0:9000 in the browser to clear security issues as we are using wss with locally generated certs.
-echo
+  echo
+  echo Don\'t forget to run ./JRPCTServerTest.js
+  echo Don\'t forget to open https://0.0.0.0:9000 in the browser to clear security issues as we are using wss with locally generated certs.
+  echo
 
-# serve the app with web-dev-server
-wds
+  # serve the app with web-dev-server using WSS
+  npx wds
+else
+  echo
+  echo Starting server without WSS...
+  echo Don\'t forget to run ./JRPCTServerTest.js
+  echo
+
+  # serve the app with web-dev-server without WSS
+  npx wds --node-resolve --watch --app-index demo/index-no-wss.html --port 8081 --config web-dev-server.config.no_wss.mjs
+fi
 
 # Copyright (c) 2016-2018 The flatmax-elements Authors. All rights reserved.
 #

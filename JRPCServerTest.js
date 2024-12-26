@@ -78,8 +78,13 @@ class TestClass2 extends TestClass {
   }
 }
 
+// Parse command line arguments
+const useSSL = !process.argv.includes('no_wss');
+
 tc2=new TestClass2; // this class will be used over js-JRPC
 
 // start the server and add the class.
-var JrpcServer=new JRPCServer.JRPCServer(9000); // start a server on port 9000
+var JrpcServer=new JRPCServer.JRPCServer(9000, 60, useSSL, false); // start a server on port 9000
 JrpcServer.addClass(tc2); // setup the class for remote use over the network
+
+console.log(`Server started on port 9000 with ${useSSL ? 'WSS' : 'WS'} protocol`);
