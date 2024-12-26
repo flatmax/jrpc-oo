@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 JSON-RPC 2.0 Client implementation with WebSocket support.
 

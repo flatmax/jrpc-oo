@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 JSON-RPC 2.0 Common base class for client and server implementations.
 
