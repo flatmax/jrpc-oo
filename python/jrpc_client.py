@@ -1,172 +1,85 @@
 #!/usr/bin/env python3
 """
-JSON-RPC 2.0 Client implementation with WebSocket support and class-based RPC
+JSON-RPC 2.0 Client implementation using jsonrpclib-pelix
 """
-import asyncio
-import json
-import websockets
+from jsonrpclib import Server
+from jsonrpclib.SimpleJSONRPCServer import SimpleJSONRPCServer
 from jrpc_common import JRPCCommon
 
 class JRPCClient(JRPCCommon):
-    def __init__(self, host="localhost", port=8080):
-        """Initialize RPC client with host and port"""
-        super().__init__()
-        self.uri = f'ws://{host}:{port}'
-        self.websocket = None
-        self._handler_task = None
-        self._response_queues = {}  # Map request IDs to response queues
-        self._connection_lock = asyncio.Lock()
-        self._connected = asyncio.Event()
+    def __init__(self, host="localhost", port=8080, client_port=8081, debug=False):
+        """Initialize RPC client with bidirectional capabilities
         
-    async def connect(self):
-        """Connect to the WebSocket server"""
-        async with self._connection_lock:
-            if not self.websocket or self.websocket.closed:
-                self.websocket = await websockets.connect(
-                    self.uri, 
-                    subprotocols=['jsonrpc']
-                )
-                # Start message handler if not running
-                if not self._handler_task or self._handler_task.done():
-                    self._handler_task = asyncio.create_task(self._handle_messages())
-                # Get initial component list
-                await self.call_remote(self.websocket, "system.listComponents")
-                self._connected.set()
-    
-    async def _handle_messages(self):
-        """Handle incoming messages from server"""
-        print("DEBUG: Starting message handler loop")
-        while True:
-            try:
-                if not self.websocket or self.websocket.closed:
-                    print("DEBUG: Websocket closed or None, waiting for reconnect")
-                    await asyncio.sleep(0.1)  # Wait before checking again
-                    continue
-
-                try:
-                    message = await self.websocket.recv()
-                    print(f"DEBUG: Received message: {message[:100]}...")
-                    
-                    parsed = json.loads(message)
-                    
-                    # Handle method calls from server
-                    if 'method' in parsed:
-                        # Handle method calls and get response
-                        response = await self.handle_message(self.websocket, message)
-                        # Only send response if there was an ID
-                        if 'id' in parsed and response:
-                            await self.websocket.send(response)
-                        continue
-                        
-                    # Handle responses to our requests
-                    if 'id' in parsed:
-                        request_id = parsed['id']
-                        if request_id in self._response_queues:
-                            print(f"DEBUG: Routing response for request {request_id}")
-                            self._response_queues[request_id].set_result(parsed)
-                            del self._response_queues[request_id]  # Clean up immediately
-                            
-                except json.JSONDecodeError:
-                    print(f"DEBUG: Invalid JSON received: {message}")
-                    
-            except (websockets.exceptions.ConnectionClosed, RuntimeError) as e:
-                print(f"DEBUG: Connection error: {e}")
-                self.websocket = None
-                # Fail any pending requests
-                for request_id, future in self._response_queues.items():
-                    if not future.done():
-                        future.set_exception(e)
-                # Don't exit loop - allow reconnection
-            except Exception as e:
-                print(f"DEBUG: Error in message handler: {e}")
-                print(f"DEBUG: Error type: {type(e)}")
-                import traceback
-                print(f"DEBUG: Traceback:\n{traceback.format_exc()}")
-                # Make sure to fail any pending requests
-                for future in self._response_queues.values():
-                    if not future.done():
-                        future.set_exception(e)
-                await asyncio.sleep(0.1)  # Wait before retrying
-
-    async def call_method(self, method: str, params=None):
-        """Make an RPC call to the server"""
-        print(f"DEBUG: Calling method {method} with params {params}")
+        Args:
+            host: Server host to connect to
+            port: Server port to connect to
+            client_port: Port to listen on for server callbacks
+        """
+        super().__init__(debug)
+        self.host = host
+        self.server_port = port
+        self.client_port = client_port
+        self.uri = f'http://{host}:{port}'
+        self.server = Server(self.uri)
         
-        # Ensure connection is active
-        retries = 3
-        while retries > 0:
-            try:
-                if not self.websocket or self.websocket.closed:
-                    print("DEBUG: Websocket not connected, connecting...")
-                    await self.connect()
-                    await self._connected.wait()
-                
-                if self.websocket and not self.websocket.closed:
-                    break
-                    
-            except Exception as e:
-                print(f"DEBUG: Connection attempt failed: {e}")
-                retries -= 1
-                if retries > 0:
-                    await asyncio.sleep(1)
-                self._connected.clear()
-                
-        if not self.websocket or self.websocket.closed:
-            raise Exception("Failed to establish websocket connection")
-            
+    def connect(self):
+        """Start client server and connect to remote server"""
+        # Start our server for callbacks
+        self.server = SimpleJSONRPCServer((self.host, self.client_port))
+        
+        # Register all instance methods
+        for class_name, instance in self.instances.items():
+            for method_name in dir(instance):
+                method = getattr(instance, method_name)
+                if callable(method) and not method_name.startswith('_'):
+                    self.server.register_function(
+                        method,
+                        name=f"{class_name}.{method_name}"
+                    )
+        
+        # Start server in background thread
+        import threading
+        self.server_thread = threading.Thread(target=self.server.serve_forever)
+        self.server_thread.daemon = True
+        self.server_thread.start()
+        
+        # Connect to remote server
         try:
-            # Create response future for this request
-            request_id = id(method)
-            response_future = asyncio.Future()
-            self._response_queues[request_id] = response_future
-            
-            print(f"DEBUG: Making remote call with request ID {request_id}")
-            await self.websocket.send(json.dumps({
-                'jsonrpc': '2.0',
-                'method': method,
-                'params': {'args': params} if params else [],
-                'id': request_id
-            }))
-            
-            # Wait for response with timeout
-            print(f"DEBUG: Waiting for response to request {request_id}")
-            try:
-                response = await asyncio.wait_for(response_future, timeout=self.remote_timeout)
-            except asyncio.TimeoutError:
-                raise Exception(f"Request timed out after {self.remote_timeout} seconds")
-            print(f"DEBUG: Got response for request {request_id}")
-            
-            if 'error' in response:
-                raise Exception(f"RPC Error: {response['error']}")
-                
-            return response['result']
-            
+            self.client = Server(self.uri)
+            components = self.client.system.listComponents()
+            self.logger.debug(f"Connected to server at {self.uri}")
+            self.logger.debug(f"Available components: {components}")
+            return True
         except Exception as e:
-            print(f"DEBUG: Error in call_method: {e}")
-            print(f"DEBUG: Error type: {type(e)}")
-            import traceback
-            print(f"DEBUG: Traceback:\n{traceback.format_exc()}")
-            raise e
-        finally:
-            # Clean up response queue
-            if request_id in self._response_queues:
-                del self._response_queues[request_id]
+            self.logger.error(f"Connection failed: {e}")
+            return False
+    
 
-    async def close(self):
-        """Close the WebSocket connection"""
-        if self.websocket:
-            await self.websocket.close()
-            self.websocket = None
-        if self._handler_task:
-            self._handler_task.cancel()
-            try:
-                await self._handler_task
-            except asyncio.CancelledError:
-                pass
-            self._handler_task = None
+    def call_method(self, method: str, params=None):
+        """Make an RPC call to the server"""
+        try:
+            if params is None:
+                params = []
+            self.logger.debug(f"Calling remote method: {method} with params: {params}")
+            method_call = getattr(self.client, method)
+            result = method_call(*params)
+            self.logger.debug(f"Method {method} returned: {result}")
+            return result
+        except Exception as e:
+            self.logger.error(f"RPC call failed: {e}")
+            raise
+
+    def close(self):
+        """Close all connections"""
+        if self.server:
+            self.server.shutdown()
+            self.server = None
+        self.client = None
 
     def __getitem__(self, class_name: str):
         """Allow dictionary-style access for RPC classes e.g. client['Calculator']"""
         return type('RPCClass', (), {
-            '__getattr__': lambda _, method: lambda *args: self.call_method(f"{class_name}.{method}", args)
+            '__getattr__': lambda _, method: lambda *args: self.call_method(
+                f"{class_name}.{method}", args
+            )
         })()
