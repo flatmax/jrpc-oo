@@ -5,15 +5,41 @@ JSON-RPC 2.0 Common base class for client and server implementations
 import asyncio
 import json
 import uuid
+import websockets
 from expose_class import ExposeClass
+from debug_utils import debug_log
 
 class JRPCCommon:
-    def __init__(self, debug=False):
+    def __init__(self, host='0.0.0.0', port=9000, use_ssl=False, debug=False):
+        """Initialize common RPC settings
+        
+        Args:
+            host: Host address to use
+            port: Port number to use
+            use_ssl: Whether to use SSL/WSS
+            debug: Enable debug logging
+        """
         self.debug = debug
         self.instances = {}  # Registered class instances
         self.remotes = {}    # Connected remote endpoints
         self.remote_timeout = 60
         self.pending_requests = {}  # Track pending RPC requests
+        
+        # URL handling
+        self.host = host
+        self.port = port
+        self.use_ssl = use_ssl
+        protocol = 'wss' if use_ssl else 'ws'
+        self.uri = f"{protocol}://{host}:{port}"
+        
+        # SSL context
+        self.ssl_context = self.setup_ssl() if use_ssl else None
+        
+    def setup_ssl(self):
+        """Abstract method to setup SSL context
+        Must be implemented by subclasses
+        """
+        raise NotImplementedError("Subclasses must implement setup_ssl()")
         
     def add_class(self, instance, class_name=None):
         """Register a class instance for RPC access"""
@@ -130,3 +156,70 @@ class JRPCCommon:
             'id': request_id
         }
         return request, request_id
+
+    async def send_message(self, message):
+        """Send a message through websocket"""
+        if not hasattr(self, 'ws') or self.ws is None:
+            raise RuntimeError("No websocket connection available")
+        await self.ws.send(json.dumps(message))
+
+    async def send_and_wait(self, request, request_id, timeout=None):
+        """Send a request and wait for response"""
+        if timeout is None:
+            timeout = self.remote_timeout
+
+        # Create future for response
+        future = asyncio.Future()
+        self.pending_requests[request_id] = future
+        
+        try:
+            # Send request
+            await self.send_message(request)
+            
+            # Wait for response with timeout
+            response = await asyncio.wait_for(future, timeout=timeout)
+            return response
+            
+        except asyncio.TimeoutError:
+            self.pending_requests.pop(request_id, None)
+            raise TimeoutError(f"Request timed out")
+        except Exception as e:
+            self.pending_requests.pop(request_id, None)
+            raise RuntimeError(f"RPC call failed: {e}")
+
+    async def process_incoming_messages(self, websocket):
+        """Common handler for processing incoming websocket messages"""
+        try:
+            async for message in websocket:
+                try:
+                    # Parse JSON-RPC message
+                    if isinstance(message, bytes):
+                        message = message.decode('utf-8')
+                    msg_data = json.loads(message)
+                    debug_log(f"Received message: {message}", self.debug)
+                    
+                    # Process message and get response
+                    response = await self.handle_message(msg_data)
+                    
+                    if response:  # Only send response if one was generated
+                        debug_log(f"Sending response: {json.dumps(response)}", self.debug)
+                        await self.send_message(response)
+                        
+                except json.JSONDecodeError as e:
+                    debug_log(f"Invalid JSON received: {e}", self.debug)
+                    await self.send_message({
+                        "jsonrpc": "2.0",
+                        "error": {"code": -32700, "message": f"Invalid JSON: {str(e)}"},
+                        "id": None
+                    })
+                except Exception as e:
+                    debug_log(f"Error processing message: {e}", self.debug)
+                    await self.send_message({
+                        "jsonrpc": "2.0",
+                        "error": {"code": -32603, "message": f"Internal error: {str(e)}"},
+                        "id": None
+                    })
+        except websockets.exceptions.ConnectionClosed:
+            debug_log("Connection closed", self.debug)
+        except Exception as e:
+            debug_log(f"Unexpected error in message processing: {e}", self.debug)

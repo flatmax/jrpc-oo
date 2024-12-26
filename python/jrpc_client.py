@@ -10,31 +10,15 @@ from jrpc_common import JRPCCommon
 from debug_utils import debug_log
 
 class JRPCClient(JRPCCommon):
-    def __init__(self, uri="ws://localhost:9000", port=None, use_ssl=False, debug=False):
-        """Initialize WebSocket RPC client
+
+    ws = None
+
+    def setup_ssl(self):
+        """Setup SSL context for client"""
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_context.load_verify_locations('./cert/server.crt')
+        return ssl_context
         
-        Args:
-            uri: WebSocket URI to connect to
-            port: Optional port number (overrides port in URI if specified)
-            use_ssl: Whether to use SSL/WSS
-            debug: Enable debug logging
-        """
-        super().__init__(debug)
-        # Handle port parameter
-        if port is not None:
-            # Parse URI and replace port
-            import urllib.parse
-            parsed = urllib.parse.urlparse(uri)
-            netloc = parsed.netloc.split(':')[0]  # Get hostname without port
-            self.uri = f"{parsed.scheme}://{netloc}:{port}"
-        else:
-            self.uri = uri
-        self.ws = None
-        self.ssl_context = None
-        if use_ssl:
-            self.ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-            self.ssl_context.load_verify_locations('./cert/server.crt')
-            
     async def connect(self):
         """Connect to the WebSocket server"""
         try:
@@ -57,14 +41,7 @@ class JRPCClient(JRPCCommon):
 
     async def _message_handler(self):
         """Handle incoming messages from server"""
-        try:
-            async for message in self.ws:
-                debug_log(f"Received: {message}", self.debug)
-                await self.handle_message(message)
-        except websockets.exceptions.ConnectionClosed:
-            debug_log("Connection closed", self.debug)
-        except Exception as e:
-            print(f"Message handler error: {e}")
+        await self.process_incoming_messages(self.ws)
 
     async def call_method(self, method: str, params=None):
         """Make an RPC call to the server
@@ -81,28 +58,7 @@ class JRPCClient(JRPCCommon):
             
         # Create request
         request, request_id = self.create_request(method, params)
-        
-        # Create future for response
-        future = asyncio.Future()
-        self.pending_requests[request_id] = future
-        
-        try:
-            # Send request
-            await self.ws.send(json.dumps(request))
-            
-            # Wait for response with timeout
-            response = await asyncio.wait_for(
-                future,
-                timeout=self.remote_timeout
-            )
-            return response
-            
-        except asyncio.TimeoutError:
-            self.pending_requests.pop(request_id, None)
-            raise TimeoutError(f"Request {method} timed out")
-        except Exception as e:
-            self.pending_requests.pop(request_id, None)
-            raise RuntimeError(f"RPC call failed: {e}")
+        return await self.send_and_wait(request, request_id)
 
     async def close(self):
         """Close the connection"""
