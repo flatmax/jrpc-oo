@@ -46,7 +46,7 @@ class NotificationServer:
 if __name__ == "__main__":    
     server = JRPCServer(port=8082, debug=True)
     notifier = NotificationServer()
-    server.register_instance(notifier)
+    server.add_class(notifier)
     
     print("Test 2 - Starting Notification Server on port 8082...")
     try:

@@ -24,7 +24,7 @@ class Calculator:
 if __name__ == "__main__":    
     server = JRPCServer(port=8080)
     calc = Calculator()
-    server.register_instance(calc)
+    server.add_class(calc)
     
     print("Test 1 - Starting Calculator Server on port 8080...")
     try:

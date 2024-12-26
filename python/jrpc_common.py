@@ -18,7 +18,7 @@ class JRPCCommon:
         self.client = None
         self.classes = []    # Registered classes for RPC
         
-    def register_instance(self, instance, class_name=None):
+    def add_class(self, instance, class_name=None):
         """Register a class instance for RPC access"""
         if class_name is None:
             class_name = instance.__class__.__name__

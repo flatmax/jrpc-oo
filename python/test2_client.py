@@ -22,7 +22,7 @@ def run_notification_test():
     
     try:
         # Register display for callbacks and start client server first
-        client.register_instance(display)
+        client.add_class(display)
         if not client.start_server():
             print("Failed to start client server")
             return
