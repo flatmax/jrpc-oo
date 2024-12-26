@@ -13,7 +13,7 @@ class Display:
     def show(self, text):
         """Handle incoming server messages"""
         self.messages.append(text)
-        print(f"\nClient [{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}] received message: '{text}'")
+        print(f"\nClient received message: '{text}'")
         return True
 
 def run_notification_test():
@@ -34,13 +34,13 @@ def run_notification_test():
             print("\nStarting Notification Test:")
             print("-" * 30)
             
-            print(f"\nClient [{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}]: Attempting to register with server...")
+            print("\nClient: Attempting to register with server...")
             try:
                 success = notifier.register_client(client.client_port)
-                print(f"Client [{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}]: Registration call returned: {success}")
+                print(f"Client: Registration call returned: {success}")
                 
                 if success:
-                    print(f"Client [{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}]: Successfully registered, waiting for notifications...")
+                    print("Client: Successfully registered, waiting for notifications...")
                     # Wait for all messages
                     time.sleep(4)
                     

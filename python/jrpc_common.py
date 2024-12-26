@@ -4,8 +4,6 @@ JSON-RPC 2.0 Common base class for client and server implementations using jsonr
 """
 from jsonrpclib.SimpleJSONRPCServer import SimpleJSONRPCServer
 from jsonrpclib import Server
-import logging
-import sys
 import asyncio
 import uuid
 import json
@@ -13,17 +11,6 @@ from expose_class import ExposeClass
 
 class JRPCCommon:
     def __init__(self, debug=False):
-        # Setup logging
-        self.logger = logging.getLogger(self.__class__.__name__)
-        if debug:
-            handler = logging.StreamHandler(sys.stdout)
-            handler.setFormatter(logging.Formatter(
-                '%(asctime)s.%(msecs)06d - %(name)s - %(levelname)s - %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
-            ))
-            self.logger.addHandler(handler)
-            self.logger.setLevel(logging.DEBUG)
-        
         self.instances = {}  # Registered class instances
         self.remotes = {}    # Connected remote endpoints
         self.remote_timeout = 60
@@ -39,7 +26,7 @@ class JRPCCommon:
         # Give the instance access to our client connection if it needs it
         if hasattr(instance, 'client'):
             instance.client = self.client
-            self.logger.debug(f"Set client connection for instance {class_name}")
+            print(f"Set client connection for instance {class_name}")
         
 
     def list_components(self):
@@ -63,10 +50,7 @@ class JRPCCommon:
             
             # Handle potential coroutine results
             if asyncio.iscoroutine(result):
-                self.logger.debug(f"Awaiting coroutine result from remote call")
                 result = await result
-                
-            self.logger.debug(f"Remote call returned: {result}")
             return result
         except Exception as e:
             print(f"Remote call failed: {e}")

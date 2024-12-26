@@ -4,7 +4,6 @@ JSON-RPC 2.0 Server implementation using jsonrpclib-pelix
 """
 from jsonrpclib.SimpleJSONRPCServer import SimpleJSONRPCServer
 from jsonrpclib import Server
-import logging
 from jrpc_common import JRPCCommon
 
 class JRPCServer(JRPCCommon):
@@ -22,14 +21,14 @@ class JRPCServer(JRPCCommon):
     def start(self):
         """Start the JSON-RPC server without connecting to client"""
         self.server = SimpleJSONRPCServer((self.host, self.port))
-        self.logger.debug(f"Server started on {self.host}:{self.port}")
+        print(f"Server started on {self.host}:{self.port}")
         
         # Register all instance methods
         for class_name, instance in self.instances.items():
             for method_name in dir(instance):
                 method = getattr(instance, method_name)
                 if callable(method) and not method_name.startswith('_'):
-                    self.logger.debug(f"Registering method: {class_name}.{method_name}")
+                    print(f"Registering method: {class_name}.{method_name}")
                     self.server.register_function(
                         method,
                         name=f"{class_name}.{method_name}"

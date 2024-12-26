@@ -27,7 +27,7 @@ class JRPCClient(JRPCCommon):
             # Start our server for callbacks
             self.server = SimpleJSONRPCServer((self.host, 0))  # Let OS assign a port
             self.client_port = self.server.server_address[1]  # Get the assigned port
-            self.logger.debug(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}] Starting client server on port {self.client_port}")
+            print(f"Starting client server on port {self.client_port}")
             
             # Register all instance methods
             for class_name, instance in self.instances.items():
@@ -44,23 +44,23 @@ class JRPCClient(JRPCCommon):
             self.server_thread = threading.Thread(target=self.server.serve_forever)
             self.server_thread.daemon = True
             self.server_thread.start()
-            self.logger.debug(f"Client server started on port {self.client_port}")
+            print(f"Client server started on port {self.client_port}")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to start client server: {e}")
+            print(f"Failed to start client server: {e}")
             return False
 
     def connect_to_server(self):
         """Connect to the remote server"""
         try:
-            self.logger.debug(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}] Attempting to connect to server at {self.uri}")
+            print(f"Attempting to connect to server at {self.uri}")
             self.client = Server(self.uri)
             components = self.client.system.listComponents()
-            self.logger.debug(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}] Connected to server at {self.uri}")
-            self.logger.debug(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}] Available components: {components}")
+            print(f"Connected to server at {self.uri}")
+            print(f"Available components: {components}")
             return True
         except Exception as e:
-            self.logger.error(f"Connection failed: {e}")
+            print(f"Connection failed: {e}")
             return False
     
 
@@ -69,13 +69,13 @@ class JRPCClient(JRPCCommon):
         try:
             if params is None:
                 params = []
-            self.logger.debug(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}.{int(time.time() * 1000000) % 1000000:06d}] Calling remote method: {method} with params: {params}")
+            print(f"Calling remote method: {method} with params: {params}")
             method_call = getattr(self.client, method)
             result = method_call(*params)
-            self.logger.debug(f"Method {method} returned: {result}")
+            print(f"Method {method} returned: {result}")
             return result
         except Exception as e:
-            self.logger.error(f"RPC call failed: {e}")
+            print(f"RPC call failed: {e}")
             raise
 
     def close(self):
