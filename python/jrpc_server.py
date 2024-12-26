@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """
-JSON-RPC 2.0 Server implementation using jsonrpclib-pelix with SSL support
+JSON-RPC 2.0 Server implementation with WebSocket and SSL support.
+
+This module provides a WebSocket server that:
+- Accepts JSON-RPC 2.0 requests
+- Manages client connections
+- Exposes Python classes and methods via RPC
+- Supports SSL/TLS encryption
+- Handles multiple concurrent clients
 """
 import ssl
-import json
 import asyncio
 import websockets
-from jsonrpclib import Server
 from jrpc_common import JRPCCommon
 from debug_utils import debug_log
 

@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """
-JSON-RPC 2.0 Common base class for client and server implementations
+JSON-RPC 2.0 Common base class for client and server implementations.
+
+This module provides the shared functionality between client and server including:
+- Message formatting and parsing
+- Request/response handling
+- WebSocket communication
+- SSL/TLS support
+- Component registration and discovery
+- Error handling
 """
 import asyncio
 import json

@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """
-JSON-RPC 2.0 Client implementation with WebSocket support
+JSON-RPC 2.0 Client implementation with WebSocket support.
+
+This module provides a WebSocket-based JSON-RPC 2.0 client implementation that can:
+- Connect to a JSON-RPC server over WebSocket
+- Make remote procedure calls
+- Handle responses and errors
+- Support SSL/TLS encryption
+- Provide async/await interface
 """
 import asyncio
 import websockets
-import json
 import ssl
 from jrpc_common import JRPCCommon
 from debug_utils import debug_log
