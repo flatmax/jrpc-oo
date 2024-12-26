@@ -27,7 +27,6 @@ class JRPCClient(JRPCCommon):
             # Start our server for callbacks
             self.server = SimpleJSONRPCServer((self.host, 0))  # Let OS assign a port
             self.client_port = self.server.server_address[1]  # Get the assigned port
-            print(f"Starting client server on port {self.client_port}")
             
             # Register all instance methods
             for class_name, instance in self.instances.items():
@@ -44,7 +43,6 @@ class JRPCClient(JRPCCommon):
             self.server_thread = threading.Thread(target=self.server.serve_forever)
             self.server_thread.daemon = True
             self.server_thread.start()
-            print(f"Client server started on port {self.client_port}")
             return True
         except Exception as e:
             print(f"Failed to start client server: {e}")
@@ -53,11 +51,9 @@ class JRPCClient(JRPCCommon):
     def connect_to_server(self):
         """Connect to the remote server"""
         try:
-            print(f"Attempting to connect to server at {self.uri}")
             self.client = Server(self.uri)
             components = self.client.system.listComponents()
             print(f"Connected to server at {self.uri}")
-            print(f"Available components: {components}")
             return True
         except Exception as e:
             print(f"Connection failed: {e}")
@@ -69,10 +65,8 @@ class JRPCClient(JRPCCommon):
         try:
             if params is None:
                 params = []
-            print(f"Calling remote method: {method} with params: {params}")
             method_call = getattr(self.client, method)
             result = method_call(*params)
-            print(f"Method {method} returned: {result}")
             return result
         except Exception as e:
             print(f"RPC call failed: {e}")

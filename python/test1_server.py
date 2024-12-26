@@ -11,17 +11,14 @@ class Calculator:
         
     def add(self, a, b):
         result = a + b
-        print(f"Server calculating: {a} + {b} = {result}")
         return result
 
     def subtract(self, a, b):
         result = a - b
-        print(f"Server calculating: {a} - {b} = {result}")
         return result
 
     def multiply(self, a, b):
         result = a * b
-        print(f"Server calculating: {a} * {b} = {result}")
         return result
 
 if __name__ == "__main__":    

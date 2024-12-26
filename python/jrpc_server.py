@@ -28,7 +28,6 @@ class JRPCServer(JRPCCommon):
             for method_name in dir(instance):
                 method = getattr(instance, method_name)
                 if callable(method) and not method_name.startswith('_'):
-                    print(f"Registering method: {class_name}.{method_name}")
                     self.server.register_function(
                         method,
                         name=f"{class_name}.{method_name}"

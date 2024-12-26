@@ -26,7 +26,6 @@ class JRPCCommon:
         # Give the instance access to our client connection if it needs it
         if hasattr(instance, 'client'):
             instance.client = self.client
-            print(f"Set client connection for instance {class_name}")
         
 
     def list_components(self):

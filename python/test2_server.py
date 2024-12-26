@@ -14,12 +14,9 @@ class NotificationServer:
     
     def register_client(self, client_port):
         """Called by client to indicate it's ready for notifications"""
-        print(f"\nServer: Register client called with port {client_port}")
         try:
             self.client = Server(f'http://localhost:{client_port}')
             self.client_ready = True
-            print("Server: Client registered successfully")
-            print("Server: Starting notifications...")
             self._send_notifications()
             return True
         except Exception as e:
@@ -28,15 +25,9 @@ class NotificationServer:
     
     def _send_notifications(self):
         """Send notifications to registered client"""
-        print("\nServer: Checking if ready to send notifications")
-        print(f"Server: client_ready = {self.client_ready}")
-        print(f"Server: client object = {self.client}")
-        
         if not self.client_ready:
-            print("Server: Not ready to send notifications")
             return False
             
-        print("\nServer: Starting notification sequence...")
         messages = [
             "Test message #1",
             "Test message #2",
@@ -47,7 +38,6 @@ class NotificationServer:
             time.sleep(1)  # Pause between messages
             try:
                 success = self.client.Display.show(msg)
-                print(f"Server sent: '{msg}', Client responded: {success}")
             except Exception as e:
                 print(f"Server Failed to send '{msg}': {e}")
                 
