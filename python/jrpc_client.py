@@ -32,7 +32,7 @@ class JRPCClient(JRPCCommon):
                 ssl=self.ssl_context
             )
             # Start message handler
-            asyncio.create_task(self._message_handler())
+            asyncio.create_task(self.process_incoming_messages(self.ws))
             
             # Get available components
             response = await self.call_method('system.listComponents')
@@ -43,10 +43,6 @@ class JRPCClient(JRPCCommon):
         except Exception as e:
             debug_log(f"Connection failed: {e}", self.debug)
             return False
-
-    async def _message_handler(self):
-        """Handle incoming messages from server"""
-        await self.process_incoming_messages(self.ws)
 
     async def call_method(self, method: str, params=None):
         """Make an RPC call to the server
