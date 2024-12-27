@@ -13,8 +13,8 @@ import asyncio
 import json
 import uuid
 import websockets
-from expose_class import ExposeClass
-from debug_utils import debug_log
+from .expose_class import ExposeClass
+from .debug_utils import debug_log
 
 class JRPCCommon:
     def __init__(self, host='0.0.0.0', port=9000, use_ssl=False, debug=False):
@@ -291,7 +291,7 @@ class JRPCCommon:
                         "id": None
                     })
         except websockets.exceptions.ConnectionClosed:
-            debug_log("Connection closed", self.debug)
+            debug_log("Connection Ld", self.debug)
         except Exception as e:
             debug_log(f"Unexpected error in message processing: {e}", self.debug)
 

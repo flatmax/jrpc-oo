@@ -11,8 +11,11 @@ This module provides a WebSocket server that:
 import ssl
 import asyncio
 import websockets
-from jrpc_common import JRPCCommon
-from debug_utils import debug_log
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from python.jrpc_common import JRPCCommon
+from python.debug_utils import debug_log
 
 class JRPCServer(JRPCCommon):
 
@@ -68,7 +71,7 @@ class JRPCServer(JRPCCommon):
         # Start the async event loop
         loop = asyncio.get_event_loop()
         loop.run_until_complete(start_server)
-        debug_log(f"Server running at {protocol}://{self.host}:{self.port}", self.debug)
+        print(f"Server running at {protocol}://{self.host}:{self.port}", self.debug)
         
     def serve_forever(self):
         """Start serving requests forever"""
@@ -76,3 +79,38 @@ class JRPCServer(JRPCCommon):
             asyncio.get_event_loop().run_forever()
         except KeyboardInterrupt:
             print("\nShutting down server...")
+            
+    async def start_background(self):
+        """Start the server in the background without blocking"""
+        protocol = 'wss' if self.use_ssl else 'ws'
+        debug_log(f"Starting {protocol}://{self.host}:{self.port}", self.debug)
+        
+        server = await websockets.serve(
+            self.handle_client,
+            self.host,
+            self.port,
+            ssl=self.ssl_context
+        )
+        print(f"Server running at {protocol}://{self.host}:{self.port}")
+        return server
+
+    def run_in_thread(self):
+        """Run the server in a background thread with its own event loop"""
+        import threading
+        
+        def run_server():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            server = loop.run_until_complete(self.start_background())
+            try:
+                loop.run_forever()
+            except KeyboardInterrupt:
+                pass
+            finally:
+                server.close()
+                loop.run_until_complete(server.wait_closed())
+                loop.close()
+
+        thread = threading.Thread(target=run_server, daemon=True)
+        thread.start()
+        return thread

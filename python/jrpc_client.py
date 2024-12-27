@@ -11,8 +11,11 @@ This module provides a WebSocket-based JSON-RPC 2.0 client implementation that c
 import asyncio
 import websockets
 import ssl
-from jrpc_common import JRPCCommon
-from debug_utils import debug_log
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from python.jrpc_common import JRPCCommon
+from python.debug_utils import debug_log
 
 class JRPCClient(JRPCCommon):
 
