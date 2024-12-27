@@ -7,10 +7,22 @@ import asyncio
 import time
 
 async def run_calculator_tests():
-    client = JRPCClient(port=8080, debug=False)
+    client = JRPCClient(port=8080, debug=True)
     
     try:
-        await client.connect()
+        print("\nAttempting to connect to server...")
+        connected = await client.connect()
+        if not connected:
+            print("Failed to connect to server")
+            return
+            
+        # Wait for connection to be fully ready
+        await client.wait_connection_ready()
+        print("\nConnection fully established!")
+        
+        # Get Calculator interface and run tests
+        print("Running Calculator Tests:")
+        print("-" * 30)
         calc = client['Calculator']
             
         print("\nRunning Calculator Tests:")

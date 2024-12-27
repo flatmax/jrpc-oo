@@ -30,7 +30,24 @@ class JRPCServer(JRPCCommon):
         client_id = str(id(websocket))
         self.ws = websocket  # Store the websocket connection
         debug_log(f"New client connected: {client_id}", self.debug)
-        await self.process_incoming_messages(websocket)
+        
+        # Start message processing in background task
+        process_messages_task = asyncio.create_task(
+            self.process_incoming_messages(websocket)
+        )
+        
+        try:
+            # Do component discovery
+            await self.discover_components()
+            debug_log("Server completed component discovery", self.debug)
+            
+            # Keep connection alive
+            await process_messages_task
+            
+        except Exception as e:
+            debug_log(f"Error in handle_client: {e}", self.debug)
+            if not process_messages_task.done():
+                process_messages_task.cancel()
 
 
     def start(self):

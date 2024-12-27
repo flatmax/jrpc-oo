@@ -31,6 +31,7 @@ class JRPCCommon:
         self.remotes = {}    # Connected remote endpoints
         self.remote_timeout = 60
         self.pending_requests = {}  # Track pending RPC requests
+        self.connection_ready_event = asyncio.Event()
         
         # URL handling
         self.host = host
@@ -99,6 +100,9 @@ class JRPCCommon:
             if method == 'system.listComponents':
                 result = self.list_components()
                 return self.result_response(result, msg_id)
+            elif method == 'system.discoveryComplete':
+                await self.connection_ready()
+                return self.result_response(True, msg_id)
 
             # Find and execute the method
             for class_name, instance in self.instances.items():
@@ -127,12 +131,20 @@ class JRPCCommon:
     async def handle_response(self, response):
         """Handle an incoming RPC response"""
         msg_id = response.get('id')
+        debug_log(f"handle_response: Processing response for ID {msg_id}", self.debug)
+        debug_log(f"handle_response: Pending requests: {list(self.pending_requests.keys())}", self.debug)
+        
         if msg_id in self.pending_requests:
+            debug_log(f"handle_response: Found pending request for {msg_id}", self.debug)
             future = self.pending_requests.pop(msg_id)
             if 'result' in response:
+                debug_log(f"handle_response: Setting result for {msg_id}", self.debug)
                 future.set_result(response['result'])
             elif 'error' in response:
+                debug_log(f"handle_response: Setting error for {msg_id}: {response['error']}", self.debug)
                 future.set_exception(Exception(response['error']))
+        else:
+            debug_log(f"handle_response: No pending request found for ID {msg_id}", self.debug)
 
     def result_response(self, result, msg_id):
         """Create a JSON-RPC result response"""
@@ -170,27 +182,79 @@ class JRPCCommon:
             raise RuntimeError("No websocket connection available")
         await self.ws.send(json.dumps(message))
 
+    async def discover_components(self):
+        """Discover available components from the remote endpoint"""
+        try:
+            debug_log("Starting component discovery...", self.debug)
+            response = await self.call_method('system.listComponents')
+            debug_log(f"Remote components discovered: {response}", self.debug)
+            self.remotes = response
+            debug_log(f"Updated remotes dictionary: {self.remotes}", self.debug)
+            # Signal that discovery is complete from this side
+            await self.call_method('system.discoveryComplete')
+            return True
+        except Exception as e:
+            debug_log(f"Component discovery failed: {e}", self.debug)
+            return False
+
+    async def connection_ready(self):
+        """Called when both sides have completed component discovery"""
+        debug_log("Connection is ready for RPC calls", self.debug)
+        self.connection_ready_event.set()
+
+    async def wait_connection_ready(self):
+        """Wait for connection to be ready"""
+        await self.connection_ready_event.wait()
+
+    async def call_method(self, method: str, params=None):
+        """Make an RPC call
+        
+        Args:
+            method: Method name to call
+            params: Parameters to pass to method
+            
+        Returns:
+            Result from remote method
+        """
+        if not self.ws:
+            raise RuntimeError("No websocket connection available")
+                
+        debug_log(f"Calling method: {method} with params: {params}", self.debug)
+        # Create request
+        request, request_id = self.create_request(method, params)
+        debug_log(f"Created request with ID: {request_id}", self.debug)
+        
+        result = await self.send_and_wait(request, request_id)
+        debug_log(f"Got result for {method}: {result}", self.debug)
+        return result
+
     async def send_and_wait(self, request, request_id, timeout=None):
         """Send a request and wait for response"""
         if timeout is None:
             timeout = self.remote_timeout
 
+        debug_log(f"send_and_wait: Creating future for request {request_id}", self.debug)
         # Create future for response
         future = asyncio.Future()
         self.pending_requests[request_id] = future
         
         try:
             # Send request
+            debug_log(f"send_and_wait: Sending request {request_id}", self.debug)
             await self.send_message(request)
             
             # Wait for response with timeout
+            debug_log(f"send_and_wait: Waiting for response to {request_id} with timeout {timeout}s", self.debug)
             response = await asyncio.wait_for(future, timeout=timeout)
+            debug_log(f"send_and_wait: Got response for {request_id}: {response}", self.debug)
             return response
             
         except asyncio.TimeoutError:
+            debug_log(f"send_and_wait: Timeout waiting for response to {request_id}", self.debug)
             self.pending_requests.pop(request_id, None)
-            raise TimeoutError(f"Request timed out")
+            raise TimeoutError(f"Request timed out after {timeout}s")
         except Exception as e:
+            debug_log(f"send_and_wait: Error for request {request_id}: {str(e)}", self.debug)
             self.pending_requests.pop(request_id, None)
             raise RuntimeError(f"RPC call failed: {e}")
 
@@ -208,6 +272,10 @@ class JRPCCommon:
                     # Process message and get response
                     response = await self.handle_message(msg_data)
                     
+                    # For responses to our requests, don't send anything back
+                    if 'result' in msg_data or 'error' in msg_data:
+                        continue
+                        
                     if response:  # Only send response if one was generated
                         debug_log(f"Sending response: {json.dumps(response)}", self.debug)
                         await self.send_message(response)

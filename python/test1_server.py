@@ -22,11 +22,12 @@ class Calculator:
         return result
 
 if __name__ == "__main__":    
-    server = JRPCServer(port=8080, debug=False)
+    server = JRPCServer(port=8080, debug=True)
     calc = Calculator()
     server.add_class(calc)
     
     print("Test 1 - Starting Calculator Server on port 8080...")
+    print("Server will wait for client discovery before starting RPC operations...")
     try:
         server.start()
         server.serve_forever()
