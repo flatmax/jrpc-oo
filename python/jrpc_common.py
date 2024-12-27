@@ -294,3 +294,11 @@ class JRPCCommon:
             debug_log("Connection closed", self.debug)
         except Exception as e:
             debug_log(f"Unexpected error in message processing: {e}", self.debug)
+
+    def __getitem__(self, class_name: str):
+        """Allow dictionary-style access for RPC classes"""
+        return type('RPCClass', (), {
+            '__getattr__': lambda _, method: lambda *args: self.call_method(
+                f"{class_name}.{method}", args
+            )
+        })()

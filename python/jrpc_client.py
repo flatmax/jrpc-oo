@@ -66,20 +66,4 @@ class JRPCClient(JRPCCommon):
             await self.ws.close()
             self.ws = None
             self.pending_requests.clear()
-            
-    async def connect_to_server(self):
-        """Connect to the main server"""
-        return await self.connect()
-        
-    async def start_server(self):
-        """Start the client's server for receiving callbacks"""
-        # For now just connect to receive callbacks
-        return await self.connect()
 
-    def __getitem__(self, class_name: str):
-        """Allow dictionary-style access for RPC classes"""
-        return type('RPCClass', (), {
-            '__getattr__': lambda _, method: lambda *args: self.call_method(
-                f"{class_name}.{method}", args
-            )
-        })()
