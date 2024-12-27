@@ -7,7 +7,7 @@ import asyncio
 import time
 
 async def run_calculator_tests():
-    client = JRPCClient(port=8080, debug=True)
+    client = JRPCClient(port=8080, debug=False)
     
     try:
         print("\nAttempting to connect to server...")

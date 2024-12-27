@@ -37,7 +37,10 @@ class JRPCServer(JRPCCommon):
         )
         
         try:
-            # Do component discovery
+            # Wait for client to discover our components first
+            await self.wait_connection_ready()
+            
+            # Then discover client's components
             await self.discover_components()
             debug_log("Server completed component discovery", self.debug)
             

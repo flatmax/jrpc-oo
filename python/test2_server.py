@@ -18,7 +18,7 @@ class NotificationServer:
 class NotificationTestServer(JRPCServer):
     """A server that sends notifications to client after connection"""
     
-    def __init__(self, port=8082, debug=True):
+    def __init__(self, port=8082, debug=False):
         super().__init__(port=port, debug=debug)
         self.notifier = NotificationServer()
         self.add_class(self.notifier)
@@ -71,7 +71,7 @@ class NotificationTestServer(JRPCServer):
                 print(f"Server Failed to send '{msg}': {e}")
 
 if __name__ == "__main__":    
-    server = NotificationTestServer(port=8082, debug=True)
+    server = NotificationTestServer(port=8082, debug=False)
     
     print("Test 2 - Starting Notification Server on port 8082...")
     try:

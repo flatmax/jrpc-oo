@@ -100,10 +100,6 @@ class JRPCCommon:
             if method == 'system.listComponents':
                 result = self.list_components()
                 return self.result_response(result, msg_id)
-            elif method == 'system.discoveryComplete':
-                await self.connection_ready()
-                return self.result_response(True, msg_id)
-
             # Find and execute the method
             for class_name, instance in self.instances.items():
                 if method.startswith(class_name + '.'):
@@ -190,8 +186,8 @@ class JRPCCommon:
             debug_log(f"Remote components discovered: {response}", self.debug)
             self.remotes = response
             debug_log(f"Updated remotes dictionary: {self.remotes}", self.debug)
-            # Signal that discovery is complete from this side
-            await self.call_method('system.discoveryComplete')
+            # Connection is ready once we've received the component list
+            await self.connection_ready()
             return True
         except Exception as e:
             debug_log(f"Component discovery failed: {e}", self.debug)

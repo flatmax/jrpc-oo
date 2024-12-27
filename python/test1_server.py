@@ -22,7 +22,7 @@ class Calculator:
         return result
 
 if __name__ == "__main__":    
-    server = JRPCServer(port=8080, debug=True)
+    server = JRPCServer(port=8080, debug=False)
     calc = Calculator()
     server.add_class(calc)
     

@@ -17,7 +17,7 @@ class Display:
         return True
 
 async def run_notification_test():
-    client = JRPCClient(port=8082, debug=True)
+    client = JRPCClient(port=8082, debug=False)
     display = Display()
     client.add_class(display)
     
