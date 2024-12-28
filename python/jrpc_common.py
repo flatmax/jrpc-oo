@@ -110,24 +110,31 @@ class JRPCCommon:
                 return self.error_response(-32600, 'Invalid Request', message_data.get('id'))
 
             # Handle discovery response
-            if message_data.get('method') == 'system.listComponents' and self.is_server():
-                debug_log("Server received listComponents request", self.debug)
-                # Process the request normally to get response
-                response = self.handle_request(message_data)
-                
-                # Send response first
-                response_json = json.dumps(response)
-                debug_log(f"Server sending response: {response_json}", self.debug)
-                if hasattr(self, 'server') and hasattr(self, 'ws'):
-                    self.server.send_message(self.ws, response_json)
+            if message_data.get('method') == 'system.listComponents':
+                debug_log("Received listComponents request", self.debug)
+                if self.is_server():
+                    # Server: Process request and respond
+                    response = self.handle_request(message_data)
+                    response_json = json.dumps(response)
+                    debug_log(f"Server sending response: {response_json}", self.debug)
+                    if hasattr(self, 'server') and hasattr(self, 'ws'):
+                        self.server.send_message(self.ws, response_json)
+                    else:
+                        self.send_message(response_json)
+                    
+                    # Now do server component discovery
+                    debug_log("discover_components calling", self.debug)
+                    success = self.discover_components()
+                    debug_log("discover_components called", self.debug)
                 else:
-                    self.send_message(response_json)
-                
-                # Now do server component discovery
-                debug_log("discover_components calling", self.debug)
-                success = self.discover_components()
-                debug_log("discover_components called", self.debug)
-
+                    # Client: Process response and set ready event
+                    debug_log("Client processing listComponents response", self.debug)
+                    response = self.handle_request(message_data)
+                    if response:
+                        self.send_message(response)
+                        # Only now set the connection ready event
+                        self.connection_ready_event.set()
+                        debug_log("Client connection_ready_event set", self.debug)
                 return None
 
             # Check if this is a response
