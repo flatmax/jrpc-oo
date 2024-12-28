@@ -16,7 +16,7 @@ def run_calculator_tests():
             return
             
         # Wait for connection to be fully ready
-        client.wait_connection_ready()
+        client.connection_ready_event.wait()
         print("\nConnection fully established!")
         
         # Get Calculator interface and run tests
