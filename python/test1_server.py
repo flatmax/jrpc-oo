@@ -9,20 +9,20 @@ class Calculator:
     def __init__(self):
         self.operations = []
         
-    async def add(self, a, b):
+    def add(self, a, b):
         result = a + b
         return result
 
-    async def subtract(self, a, b):
+    def subtract(self, a, b):
         result = a - b
         return result
 
-    async def multiply(self, a, b):
+    def multiply(self, a, b):
         result = a * b
         return result
 
 if __name__ == "__main__":    
-    server = JRPCServer(port=8080, debug=False)
+    server = JRPCServer(port=8080, debug=True)
     calc = Calculator()
     server.add_class(calc)
     
@@ -30,6 +30,5 @@ if __name__ == "__main__":
     print("Server will wait for client discovery before starting RPC operations...")
     try:
         server.start()
-        server.serve_forever()
     except KeyboardInterrupt:
         print("\nShutting down calculator server...")

@@ -9,10 +9,13 @@ This module provides the shared functionality between client and server includin
 - Component registration and discovery
 - Error handling
 """
-import asyncio
 import json
 import uuid
-import websockets
+import threading
+import queue
+import time
+from concurrent.futures import ThreadPoolExecutor
+from websocket import WebSocket, create_connection
 from .expose_class import ExposeClass
 from .debug_utils import debug_log
 
@@ -31,7 +34,7 @@ class JRPCCommon:
         self.remotes = {}    # Connected remote endpoints
         self.remote_timeout = 60
         self.pending_requests = {}  # Track pending RPC requests
-        self.connection_ready_event = asyncio.Event()
+        self.connection_ready_event = threading.Event()
         
         # URL handling
         self.host = host
@@ -68,38 +71,62 @@ class JRPCCommon:
                 components[method_name] = True
         return components
 
-    async def handle_message(self, message_data):
+    def handle_message(self, message_data):
         """Process an incoming JSON-RPC message"""
         try:
+            debug_log(f"handle_message: Processing message: {message_data}", self.debug)
+            
             if not isinstance(message_data, dict):
+                debug_log("handle_message: Converting string to dict", self.debug)
                 message_data = json.loads(message_data)
                 
             if 'jsonrpc' not in message_data or message_data['jsonrpc'] != '2.0':
+                debug_log("handle_message: Invalid JSON-RPC version", self.debug)
                 return self.error_response(-32600, 'Invalid Request', message_data.get('id'))
 
             if 'method' in message_data:  # This is a request
-                return await self.handle_request(message_data)
+                debug_log(f"handle_message: Processing request for method: {message_data['method']}", self.debug)
+                return self.handle_request(message_data)
             elif 'result' in message_data or 'error' in message_data:  # This is a response
-                return await self.handle_response(message_data)
+                debug_log("handle_message: Processing response", self.debug)
+                return self.handle_response(message_data)
             else:
+                debug_log("handle_message: Invalid message format", self.debug)
                 return self.error_response(-32600, 'Invalid Request', message_data.get('id'))
                 
         except Exception as e:
             return self.error_response(-32603, f'Internal error: {str(e)}', None)
 
-    async def handle_request(self, request):
+    def handle_request(self, request):
         """Handle an incoming RPC request"""
         method = request.get('method')
         params = request.get('params', [])
         msg_id = request.get('id')
 
+        debug_log(f"handle_request: Processing method {method} with ID {msg_id}", self.debug)
+
         if not method:
             return self.error_response(-32600, 'Method not specified', msg_id)
 
         try:
-            if method == 'system.listComponents':
-                result = self.list_components()
-                return self.result_response(result, msg_id)
+            # Only handle system.listComponents on server side
+            if method == 'system.listComponents' and hasattr(self, 'instances'):
+                debug_log("handle_request: Handling system.listComponents", self.debug)
+                debug_log(f"handle_request: Current instances: {list(self.instances.keys())}", self.debug)
+                result = {}
+                for class_name, instance in self.instances.items():
+                    debug_log(f"handle_request: Processing class {class_name}", self.debug)
+                    methods = [name for name in dir(instance) 
+                             if callable(getattr(instance, name)) and not name.startswith('_')]
+                    for method in methods:
+                        method_name = f"{class_name}.{method}"
+                        result[method_name] = True
+                        debug_log(f"handle_request: Added method {method_name}", self.debug)
+                
+                debug_log(f"handle_request: Final components list: {result}", self.debug)
+                response = self.result_response(result, msg_id)
+                debug_log(f"handle_request: Generated response: {response}", self.debug)
+                return response
             # Find and execute the method
             for class_name, instance in self.instances.items():
                 if method.startswith(class_name + '.'):
@@ -110,13 +137,13 @@ class JRPCCommon:
                             # Handle wrapped args parameter format from JS client
                             if isinstance(params, dict) and 'args' in params:
                                 if isinstance(params['args'], list):
-                                    result = await method_func(*params['args'])
+                                    result = method_func(*params['args'])
                                 else:
-                                    result = await method_func(params['args'])
+                                    result = method_func(params['args'])
                             elif isinstance(params, dict):
-                                result = await method_func(**params)
+                                result = method_func(**params)
                             else:
-                                result = await method_func(*params)
+                                result = method_func(*params)
                             return self.result_response(result, msg_id)
 
             return self.error_response(-32601, f'Method {method} not found', msg_id)
@@ -124,7 +151,7 @@ class JRPCCommon:
         except Exception as e:
             return self.error_response(-32000, str(e), msg_id)
 
-    async def handle_response(self, response):
+    def handle_response(self, response):
         """Handle an incoming RPC response"""
         msg_id = response.get('id')
         debug_log(f"handle_response: Processing response for ID {msg_id}", self.debug)
@@ -135,7 +162,7 @@ class JRPCCommon:
             future = self.pending_requests.pop(msg_id)
             if 'result' in response:
                 debug_log(f"handle_response: Setting result for {msg_id}", self.debug)
-                future.set_result(response['result'])
+                future.put(response)
             elif 'error' in response:
                 debug_log(f"handle_response: Setting error for {msg_id}: {response['error']}", self.debug)
                 future.set_exception(Exception(response['error']))
@@ -172,37 +199,37 @@ class JRPCCommon:
         }
         return request, request_id
 
-    async def send_message(self, message):
+    def send_message(self, message):
         """Send a message through websocket"""
         if not hasattr(self, 'ws') or self.ws is None:
             raise RuntimeError("No websocket connection available")
-        await self.ws.send(json.dumps(message))
+        self.ws.send(json.dumps(message))
 
-    async def discover_components(self):
+    def discover_components(self):
         """Discover available components from the remote endpoint"""
         try:
             debug_log("Starting component discovery...", self.debug)
-            response = await self.call_method('system.listComponents')
+            response = self.call_method('system.listComponents')
             debug_log(f"Remote components discovered: {response}", self.debug)
             self.remotes = response
             debug_log(f"Updated remotes dictionary: {self.remotes}", self.debug)
             # Connection is ready once we've received the component list
-            await self.connection_ready()
+            self.connection_ready()
             return True
         except Exception as e:
             debug_log(f"Component discovery failed: {e}", self.debug)
             return False
 
-    async def connection_ready(self):
+    def connection_ready(self):
         """Called when both sides have completed component discovery"""
         debug_log("Connection is ready for RPC calls", self.debug)
         self.connection_ready_event.set()
 
-    async def wait_connection_ready(self):
+    def wait_connection_ready(self, timeout=None):
         """Wait for connection to be ready"""
-        await self.connection_ready_event.wait()
+        return self.connection_ready_event.wait(timeout=timeout)
 
-    async def call_method(self, method: str, params=None):
+    def call_method(self, method: str, params=None):
         """Make an RPC call
         
         Args:
@@ -220,80 +247,79 @@ class JRPCCommon:
         request, request_id = self.create_request(method, params)
         debug_log(f"Created request with ID: {request_id}", self.debug)
         
-        result = await self.send_and_wait(request, request_id)
+        result = self.send_and_wait(request, request_id)
         debug_log(f"Got result for {method}: {result}", self.debug)
         return result
 
-    async def send_and_wait(self, request, request_id, timeout=None):
+    def send_and_wait(self, request, request_id, timeout=None):
         """Send a request and wait for response"""
         if timeout is None:
             timeout = self.remote_timeout
 
         debug_log(f"send_and_wait: Creating future for request {request_id}", self.debug)
         # Create future for response
-        future = asyncio.Future()
-        self.pending_requests[request_id] = future
+        response_queue = queue.Queue()
+        self.pending_requests[request_id] = response_queue
         
         try:
             # Send request
             debug_log(f"send_and_wait: Sending request {request_id}", self.debug)
-            await self.send_message(request)
+            self.send_message(request)
             
             # Wait for response with timeout
             debug_log(f"send_and_wait: Waiting for response to {request_id} with timeout {timeout}s", self.debug)
-            response = await asyncio.wait_for(future, timeout=timeout)
-            debug_log(f"send_and_wait: Got response for {request_id}: {response}", self.debug)
-            return response
+            try:
+                response = response_queue.get(timeout=timeout)
+                debug_log(f"send_and_wait: Got response for {request_id}: {response}", self.debug)
+                if isinstance(response, dict) and 'error' in response:
+                    raise RuntimeError(response['error'].get('message', 'Unknown error'))
+                if isinstance(response, dict) and 'result' in response:
+                    return response['result']
+                return response
+            except queue.Empty:
+                debug_log(f"send_and_wait: Timeout waiting for response to {request_id}", self.debug)
+                raise TimeoutError(f"Request timed out after {timeout}s")
             
-        except asyncio.TimeoutError:
-            debug_log(f"send_and_wait: Timeout waiting for response to {request_id}", self.debug)
-            self.pending_requests.pop(request_id, None)
-            raise TimeoutError(f"Request timed out after {timeout}s")
         except Exception as e:
             debug_log(f"send_and_wait: Error for request {request_id}: {str(e)}", self.debug)
-            self.pending_requests.pop(request_id, None)
             raise RuntimeError(f"RPC call failed: {e}")
+        finally:
+            self.pending_requests.pop(request_id, None)
 
-    async def process_incoming_messages(self, websocket):
-        """Common handler for processing incoming websocket messages"""
+    def process_message(self, message):
+        """Process a single message"""
         try:
-            async for message in websocket:
-                try:
-                    # Parse JSON-RPC message
-                    if isinstance(message, bytes):
-                        message = message.decode('utf-8')
-                    msg_data = json.loads(message)
-                    debug_log(f"Received message: {message}", self.debug)
-                    
-                    # Process message and get response
-                    response = await self.handle_message(msg_data)
-                    
-                    # For responses to our requests, don't send anything back
-                    if 'result' in msg_data or 'error' in msg_data:
-                        continue
-                        
-                    if response:  # Only send response if one was generated
-                        debug_log(f"Sending response: {json.dumps(response)}", self.debug)
-                        await self.send_message(response)
-                        
-                except json.JSONDecodeError as e:
-                    debug_log(f"Invalid JSON received: {e}", self.debug)
-                    await self.send_message({
-                        "jsonrpc": "2.0",
-                        "error": {"code": -32700, "message": f"Invalid JSON: {str(e)}"},
-                        "id": None
-                    })
-                except Exception as e:
-                    debug_log(f"Error processing message: {e}", self.debug)
-                    await self.send_message({
-                        "jsonrpc": "2.0",
-                        "error": {"code": -32603, "message": f"Internal error: {str(e)}"},
-                        "id": None
-                    })
-        except websockets.exceptions.ConnectionClosed:
-            debug_log("Connection Ld", self.debug)
+            # Parse JSON-RPC message
+            if isinstance(message, bytes):
+                message = message.decode('utf-8')
+            msg_data = json.loads(message)
+            debug_log(f"Received message: {message}", self.debug)
+            
+            # Process message and get response
+            response = self.handle_message(msg_data)
+            
+            # For responses to our requests, don't send anything back
+            if 'result' in msg_data or 'error' in msg_data:
+                return None
+                
+            if response:  # Only send response if one was generated
+                debug_log(f"Sending response: {json.dumps(response)}", self.debug)
+                return response
+                
+        except json.JSONDecodeError as e:
+            debug_log(f"Invalid JSON received: {e}", self.debug)
+            return {
+                "jsonrpc": "2.0",
+                "error": {"code": -32700, "message": f"Invalid JSON: {str(e)}"},
+                "id": None
+            }
         except Exception as e:
-            debug_log(f"Unexpected error in message processing: {e}", self.debug)
+            debug_log(f"Error processing message: {e}", self.debug)
+            return {
+                "jsonrpc": "2.0",
+                "error": {"code": -32603, "message": f"Internal error: {str(e)}"},
+                "id": None
+            }
 
     def __getitem__(self, class_name: str):
         """Allow dictionary-style access for RPC classes"""
