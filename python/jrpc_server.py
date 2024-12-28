@@ -19,6 +19,9 @@ from python.jrpc_common import JRPCCommon
 from python.debug_utils import debug_log
 
 class JRPCServer(JRPCCommon):
+    # Override parent class variables
+    is_server = True
+
     def setup_ssl(self):
         """Setup SSL context for server"""
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -59,14 +62,6 @@ class JRPCServer(JRPCCommon):
             thread.start()
         except Exception as e:
             debug_log(f"Error in server message_received: {e}", self.debug)
-
-    def is_server(self):
-        """This is a server instance"""
-        return True
-        
-    def is_client(self):
-        """This is not a client instance"""
-        return False
 
     def start(self):
         """Start the WebSocket server"""

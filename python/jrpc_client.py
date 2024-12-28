@@ -21,32 +21,14 @@ from python.debug_utils import debug_log
 class JRPCClient(JRPCCommon):
 
     ws = None
-    
-    def __init__(self, host='0.0.0.0', port=9000, use_ssl=False, debug=False):
-        """Initialize common RPC settings
-        
-        Args:
-            host: Host address to use
-            port: Port number to use
-            use_ssl: Whether to use SSL/WSS
-            debug: Enable debug logging
-        """
-        super().__init__(host=host, port=port, use_ssl=use_ssl, debug=debug)
-        self.pending_requests = {}
+    # Override parent class variables
+    is_client = True
 
     def setup_ssl(self):
         """Setup SSL context for client"""
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ssl_context.load_verify_locations('./cert/server.crt')
         return ssl_context
-        
-    def is_server(self):
-        """This is not a server instance"""
-        return False
-        
-    def is_client(self):
-        """This is a client instance"""
-        return True
 
     def connect(self):
         """Connect to the WebSocket server"""

@@ -17,6 +17,11 @@ from .expose_class import ExposeClass
 from .debug_utils import debug_log
 
 class JRPCCommon:
+    # Default values that subclasses will override
+    is_server = False
+    is_client = False
+    pending_requests = {}
+
     def __init__(self, host='0.0.0.0', port=9000, use_ssl=False, debug=False):
         """Initialize common RPC settings
         
@@ -53,19 +58,6 @@ class JRPCCommon:
         Must be implemented by subclasses
         """
         raise NotImplementedError("Subclasses must implement setup_ssl()")
-
-    def is_server(self):
-        """Whether this instance is a server
-        Must be implemented by subclasses
-        """
-        raise NotImplementedError("Subclasses must implement is_server()")
-
-    def is_client(self):
-        """Whether this instance is a client
-        Must be implemented by subclasses
-        """
-        raise NotImplementedError("Subclasses must implement is_client()")
-
         
     def add_class(self, instance, class_name=None):
         """Register a class instance for RPC access"""
@@ -112,7 +104,7 @@ class JRPCCommon:
             # Handle discovery response
             if message_data.get('method') == 'system.listComponents':
                 debug_log("Received listComponents request", self.debug)
-                if self.is_server():
+                if self.is_server:
                     # Server: Process request and respond
                     response = self.handle_request(message_data)
                     response_json = json.dumps(response)
