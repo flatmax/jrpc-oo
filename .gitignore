@@ -5,3 +5,5 @@ package-lock.json
 .aider*
 .env
 *.pyc
+*.egg-info/
+**/__pycache__/
