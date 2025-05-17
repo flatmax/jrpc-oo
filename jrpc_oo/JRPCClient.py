@@ -3,7 +3,6 @@ JSON-RPC Client implementation over WebSockets.
 """
 
 import json
-import ssl
 import threading
 import time
 from websocket import WebSocketApp
@@ -40,12 +39,8 @@ class JRPCClient(JRPCCommon):
             on_close=self.on_close
         )
         
-        # Start the WebSocket connection in a separate thread
-        ws_thread = threading.Thread(target=self.ws.run_forever, kwargs={
-            'sslopt': {"cert_reqs": ssl.CERT_NONE}
-        })
-        ws_thread.daemon = True
-        ws_thread.start()
+        # Start the WebSocket connection using the common method
+        self.ws_thread = self.start_background_thread(self.ws)
         
         # Wait for connection to be established
         start_time = time.time()
@@ -64,6 +59,7 @@ class JRPCClient(JRPCCommon):
         # Create a new remote for this connection
         remote = self.new_remote()
         remote['ws'] = ws
+        remote['connection'] = ws  # Use consistent key for connection
         remote['client'] = self
         
         # Request the list of available methods
@@ -78,61 +74,17 @@ class JRPCClient(JRPCCommon):
             ws: WebSocket object
             message: Message received
         """
-        try:
-            data = json.loads(message)
-            
-            # Handle requests from the server
-            if 'method' in data:
-                method_name = data['method']
-                params = data.get('params', {})
-                request_id = data.get('id')
-                
-                # Find method in exposed classes
-                method_found = False
-                result = None
-                error = None
-                
-                for cls in self.classes:
-                    if method_name in cls:
-                        try:
-                            method_found = True
-                            result = cls[method_name](params)
-                            break
-                        except Exception as e:
-                            error = str(e)
-                            print(f"Error executing {method_name}: {e}")
-                
-                # Send response if request had an ID
-                if request_id is not None:
-                    if method_found and error is None:
-                        response = {
-                            'jsonrpc': '2.0',
-                            'result': result,
-                            'id': request_id
-                        }
-                    else:
-                        response = {
-                            'jsonrpc': '2.0',
-                            'error': {
-                                'code': -32601 if not method_found else -32000,
-                                'message': f'Method not found: {method_name}' if not method_found else error
-                            },
-                            'id': request_id
-                        }
-                    ws.send(json.dumps(response))
-            
-            # Handle responses to our requests
-            elif ('result' in data or 'error' in data) and 'id' in data:
-                request_id = data['id']
-                if request_id in self.pending_requests:
-                    callback = self.pending_requests[request_id]['callback']
-                    if 'error' in data:
-                        callback(data['error'], None)
-                    else:
-                        callback(None, data['result'])
-                    del self.pending_requests[request_id]
-        except json.JSONDecodeError:
-            print(f"Invalid JSON received: {message}")
+        self.process_message(ws, message)
+    
+    def send_response(self, connection, message):
+        """
+        Send a response to a WebSocket connection.
+        
+        Args:
+            connection: WebSocket connection
+            message: The message to send
+        """
+        connection.send(message)
     
     def on_error(self, ws, error):
         """
@@ -145,6 +97,23 @@ class JRPCClient(JRPCCommon):
         print(f"WebSocket error: {error}")
         self.setup_skip()
     
+    def handle_response(self, remote, data):
+        """
+        Handle responses to requests we've sent.
+        
+        Args:
+            remote: The remote connection
+            data: The parsed JSON-RPC response
+        """
+        request_id = data.get('id')
+        if request_id in self.pending_requests:
+            callback = self.pending_requests[request_id]['callback']
+            if 'error' in data:
+                callback(data['error'], None)
+            else:
+                callback(None, data['result'])
+            del self.pending_requests[request_id]
+    
     def on_close(self, ws, close_status_code, close_msg):
         """
         Handle WebSocket connection close.
@@ -154,15 +123,7 @@ class JRPCClient(JRPCCommon):
             close_status_code: Status code
             close_msg: Close message
         """
-        # Find the remote for this connection
-        uuid_to_remove = None
-        for uuid, remote in self.remotes.items():
-            if remote.get('ws') == ws:
-                uuid_to_remove = uuid
-                break
-        
-        if uuid_to_remove:
-            self.rm_remote(None, uuid_to_remove)
+        self.handle_connection_closed(ws)
     
     def setup_skip(self):
         """Handle setup failure."""

@@ -3,10 +3,7 @@ JSON-RPC Server implementation over WebSockets.
 """
 
 import json
-import ssl
 import threading
-import os
-import sys
 from websocket_server import WebsocketServer
 from .JRPCCommon import JRPCCommon
 
@@ -16,51 +13,21 @@ class JRPCServer(JRPCCommon):
     Similar to the JavaScript JRPCServer.
     """
     
-    def __init__(self, port=9000, remote_timeout=60, use_ssl=True):
+    def __init__(self, port=9000, remote_timeout=60):
         """
         Initialize the server.
         
         Args:
             port: The port number to use for socket binding
             remote_timeout: The maximum timeout of connection
-            use_ssl: Set False for regular connection, True for secure connection
         """
         super().__init__()
         self.remote_timeout = remote_timeout
         
-        # Check which version of websocket-server we're using
+        # Simple WebSocket server initialization
         try:
-            # Setup the WebSocket server with SSL if supported
-            if use_ssl:
-                try:
-                    # Try to find certificate files
-                    cert_path = './cert/server.crt'
-                    key_path = './cert/server.key'
-                    
-                    if not os.path.exists(cert_path) or not os.path.exists(key_path):
-                        print(f"Warning: SSL certificates not found at {cert_path} and {key_path}")
-                        print("Falling back to non-SSL mode")
-                        self.wss = WebsocketServer(host='0.0.0.0', port=port)
-                    else:
-                        # Try to initialize with SSL
-                        try:
-                            # Some websocket_server versions support ssl_context parameter
-                            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-                            ssl_context.load_cert_chain(cert_path, key_path)
-                            self.wss = WebsocketServer(host='0.0.0.0', port=port, ssl=ssl_context)
-                            print("Server running with SSL support")
-                        except TypeError:
-                            # If ssl parameter is not supported
-                            print("Warning: This version of websocket_server doesn't support SSL")
-                            print("Connection will be insecure")
-                            self.wss = WebsocketServer(host='0.0.0.0', port=port)
-                except Exception as e:
-                    print(f"SSL initialization error: {e}")
-                    print("Falling back to non-SSL mode")
-                    self.wss = WebsocketServer(host='0.0.0.0', port=port)
-            else:
-                # Non-SSL mode
-                self.wss = WebsocketServer(host='0.0.0.0', port=port)
+            # Initialize without SSL
+            self.wss = WebsocketServer(host='0.0.0.0', port=port)
         except Exception as e:
             print(f"Error initializing WebSocket server: {e}")
             raise
@@ -72,11 +39,9 @@ class JRPCServer(JRPCCommon):
     
     def start(self):
         """Start the server."""
-        # Run the server in a background thread
-        server_thread = threading.Thread(target=self.wss.run_forever)
-        server_thread.daemon = True
-        server_thread.start()
-        return server_thread
+        # Run the server in a background thread using the common method
+        self.ws_thread = self.start_background_thread(self.wss)
+        return self.ws_thread
     
     def on_new_client(self, client, server):
         """
@@ -88,7 +53,7 @@ class JRPCServer(JRPCCommon):
         """
         remote = self.new_remote()
         remote['client'] = client
-        remote['rpcs'] = {}
+        remote['connection'] = client  # Use consistent key for connection
         
         # Setup the WebSocket for this remote
         self.setup_remote(remote, client)
@@ -103,15 +68,7 @@ class JRPCServer(JRPCCommon):
             client: Client information
             server: Server object
         """
-        # Find the remote for this client
-        uuid_to_remove = None
-        for uuid, remote in self.remotes.items():
-            if remote.get('client') == client:
-                uuid_to_remove = uuid
-                break
-        
-        if uuid_to_remove:
-            self.rm_remote(None, uuid_to_remove)
+        self.handle_connection_closed(client)
     
     def on_message_received(self, client, server, message):
         """
@@ -122,94 +79,17 @@ class JRPCServer(JRPCCommon):
             server: Server object
             message: The message received
         """
-        # Find the remote for this client
-        remote = None
-        for r in self.remotes.values():
-            if r.get('client') == client:
-                remote = r
-                break
+        self.process_message(client, message)
+    
+    def send_response(self, connection, message):
+        """
+        Send a response to a client connection.
         
-        if not remote:
-            print("Message received from unknown client")
-            return
-        
-        try:
-            # Parse the message
-            data = json.loads(message)
-            
-            # Handle the message based on JSON-RPC format
-            if 'method' in data:
-                # Handle method call
-                method_name = data['method']
-                params = data.get('params', {})
-                request_id = data.get('id')
-                
-                # Handle system.listComponents request
-                if method_name == 'system.listComponents':
-                    components = {}
-                    for cls in self.classes:
-                        for name in cls.keys():
-                            components[name] = name
-                    
-                    response = {
-                        'jsonrpc': '2.0',
-                        'result': components,
-                        'id': request_id
-                    }
-                    self.wss.send_message(client, json.dumps(response))
-                    return
-                
-                # Find method in exposed classes
-                method_found = False
-                result = None
-                
-                for cls in self.classes:
-                    if method_name in cls:
-                        try:
-                            # Extract args if available
-                            method_found = True
-                            result = cls[method_name](params)
-                            break
-                        except Exception as e:
-                            print(f"Error executing {method_name}: {e}")
-                            if request_id is not None:
-                                error_response = {
-                                    'jsonrpc': '2.0',
-                                    'error': {
-                                        'code': -32000,
-                                        'message': str(e)
-                                    },
-                                    'id': request_id
-                                }
-                                self.wss.send_message(client, json.dumps(error_response))
-                            return
-                
-                # Send response if request had an ID
-                if request_id is not None:
-                    if method_found:
-                        response = {
-                            'jsonrpc': '2.0',
-                            'result': result,
-                            'id': request_id
-                        }
-                    else:
-                        response = {
-                            'jsonrpc': '2.0',
-                            'error': {
-                                'code': -32601,
-                                'message': f'Method not found: {method_name}'
-                            },
-                            'id': request_id
-                        }
-                    self.wss.send_message(client, json.dumps(response))
-            
-            # Handle response to a previous request
-            elif ('result' in data or 'error' in data) and 'id' in data:
-                # Process response - this would be for client->server calls
-                pass
-            
-        except json.JSONDecodeError:
-            print(f"Invalid JSON received: {message}")
+        Args:
+            connection: Client connection
+            message: The message to send
+        """
+        self.wss.send_message(connection, message)
     
     def setup_remote(self, remote, ws):
         """

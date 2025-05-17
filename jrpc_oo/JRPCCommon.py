@@ -3,6 +3,7 @@ Common functionality for JSON-RPC over WebSockets.
 """
 
 import uuid
+import json
 import threading
 from jsonrpclib.jsonrpc import ServerProxy
 from .ExposeClass import ExposeClass
@@ -20,6 +21,7 @@ class JRPCCommon:
         self.call = {}     # Methods to call all remotes
         self.classes = []  # List of exposed class objects
         self.remote_timeout = 60  # Default timeout
+        self.ws_thread = None  # Thread for WebSocket connection
     
     def new_remote(self):
         """
@@ -30,6 +32,7 @@ class JRPCCommon:
         """
         remote = {}
         remote["uuid"] = str(uuid.uuid4())
+        remote["rpcs"] = {}  # Initialize rpcs dictionary for all remotes
         if self.remotes is None:
             self.remotes = {}
         self.remotes[remote["uuid"]] = remote
@@ -199,6 +202,188 @@ class JRPCCommon:
     def setup_done(self):
         """Called when setup is complete."""
         pass
+        
+    def handle_message(self, remote, message):
+        """
+        Common method to handle JSON-RPC messages.
+        
+        Args:
+            remote: The remote connection object
+            message: The JSON-RPC message received
+        
+        Returns:
+            Tuple of (response, is_notification) where:
+                - response is the JSON-RPC response object or None
+                - is_notification is True if the message was a notification (no id)
+        """
+        try:
+            # Parse the message
+            data = json.loads(message)
+            
+            # Handle the message based on JSON-RPC format
+            if 'method' in data:
+                # Handle method call
+                method_name = data['method']
+                params = data.get('params', {})
+                request_id = data.get('id')
+                
+                # Handle system.listComponents request separately
+                if method_name == 'system.listComponents':
+                    return self.handle_system_list_components(remote, request_id), False
+                
+                # Find method in exposed classes
+                method_found = False
+                result = None
+                error = None
+                
+                for cls in self.classes:
+                    if method_name in cls:
+                        try:
+                            method_found = True
+                            result = cls[method_name](params)
+                            break
+                        except Exception as e:
+                            error = str(e)
+                            print(f"Error executing {method_name}: {e}")
+                
+                # Create response if request had an ID
+                if request_id is not None:
+                    if method_found and error is None:
+                        return {
+                            'jsonrpc': '2.0',
+                            'result': result,
+                            'id': request_id
+                        }, False
+                    else:
+                        return {
+                            'jsonrpc': '2.0',
+                            'error': {
+                                'code': -32601 if not method_found else -32000,
+                                'message': f'Method not found: {method_name}' if not method_found else error
+                            },
+                            'id': request_id
+                        }, False
+                return None, True  # It's a notification, no response needed
+            
+            # Handle response to a previous request
+            elif ('result' in data or 'error' in data) and 'id' in data:
+                self.handle_response(remote, data)
+                return None, True  # No response needed for a response
+                
+            return None, True  # Unknown message type, treat as notification
+                
+        except json.JSONDecodeError:
+            print(f"Invalid JSON received: {message}")
+            return {
+                'jsonrpc': '2.0',
+                'error': {
+                    'code': -32700,
+                    'message': 'Parse error: Invalid JSON'
+                },
+                'id': None
+            }, False
+    
+    def handle_system_list_components(self, remote, request_id):
+        """
+        Handle the system.listComponents request.
+        
+        Args:
+            remote: The remote connection
+            request_id: The request ID to include in the response
+            
+        Returns:
+            The response object
+        """
+        components = {}
+        for cls in self.classes:
+            for name in cls.keys():
+                components[name] = name
+        
+        return {
+            'jsonrpc': '2.0',
+            'result': components,
+            'id': request_id
+        }
+    
+    def handle_response(self, remote, data):
+        """
+        Handle responses to requests we've sent.
+        By default does nothing, should be overridden by subclasses.
+        
+        Args:
+            remote: The remote connection
+            data: The parsed JSON-RPC response
+        """
+        pass
+    
+    def process_message(self, connection, message):
+        """
+        Process a message from a connection.
+        
+        Args:
+            connection: The connection object (ws or client)
+            message: The message received
+        """
+        # Find the remote for this connection
+        remote = None
+        for r in self.remotes.values():
+            if r.get('connection') == connection:
+                remote = r
+                break
+        
+        if not remote:
+            print("Message received from unknown connection")
+            return
+        
+        # Use common message handling
+        response, is_notification = self.handle_message(remote, message)
+        
+        # Send response if needed
+        if not is_notification and response is not None:
+            self.send_response(connection, json.dumps(response))
+    
+    def send_response(self, connection, message):
+        """
+        Send a response back to a connection.
+        Must be implemented by subclasses.
+        
+        Args:
+            connection: The connection to send to
+            message: The message to send
+        """
+        raise NotImplementedError("Subclasses must implement send_response")
+    
+    def handle_connection_closed(self, connection):
+        """
+        Common handler for when a connection is closed.
+        
+        Args:
+            connection: The closed connection object
+        """
+        # Find the remote for this connection
+        uuid_to_remove = None
+        for uuid, remote in self.remotes.items():
+            if remote.get('connection') == connection:
+                uuid_to_remove = uuid
+                break
+        
+        if uuid_to_remove:
+            self.rm_remote(None, uuid_to_remove)
+        
+    def start_background_thread(self, target):
+        """
+        Start a background thread for the given target.
+        
+        Args:
+            target: The object with a run_forever method
+        
+        Returns:
+            The created thread
+        """
+        thread = threading.Thread(target=target.run_forever)
+        thread.daemon = True
+        thread.start()
+        return thread
     
     def add_class(self, c, obj_name=None):
         """
