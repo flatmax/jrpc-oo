@@ -198,7 +198,6 @@ class JRPCCommon:
                     if hasattr(instance, method_name):
                         method_func = getattr(instance, method_name)
                         if callable(method_func):
-                            print(f"Executing method {class_name}.{method_name} with params: {params}")
                             
                             # Handle wrapped args parameter format from JS client
                             try:
@@ -209,30 +208,24 @@ class JRPCCommon:
                                     if 'args' in params:
                                         # This is how js-jrpc sends parameters
                                         if isinstance(params['args'], list):
-                                            print(f"Unpacking args from list: {params['args']}")
                                             args = params['args']
                                         else:
-                                            print(f"Single arg: {params['args']}")
                                             args = [params['args']]
                                     else:
                                         # Handle old-style dict params as kwargs
                                         kwargs = params
                                 elif isinstance(params, list):
                                     # Handle direct list as positional args
-                                    print(f"List params: {params}")
                                     args = params
                                 elif params is not None:
                                     # Handle single non-dict, non-list param
-                                    print(f"Direct param: {params}")
                                     args = [params]
                                 
-                                print(f"Calling {method_name} with args={args}, kwargs={kwargs}")
                                 if kwargs:
                                     result = method_func(**kwargs)
                                 else:
                                     result = method_func(*args)
                                     
-                                print(f"Method execution result: {result}")
                                 return self.result_response(result, msg_id)
                             except Exception as e:
                                 print(f"Method execution error: {str(e)}")
@@ -414,8 +407,6 @@ class JRPCCommon:
             server: Optional server instance (for server-side)
         """
         try:
-            print(f"Processing incoming message: {message}")
-            
             # Store client/server refs if provided (server-side)
             if client and server:
                 self.ws = client
@@ -457,8 +448,6 @@ class JRPCCommon:
                     "id": None
                 }
                 
-            print(f"Processed message data: {json.dumps(msg_data)}")
-            
             # Process message and get response
             response = self.handle_message(msg_data)
             
@@ -467,7 +456,6 @@ class JRPCCommon:
                 return None
                 
             if response:  # Only send response if one was generated
-                print(f"Generated response: {response}")
                 
                 # Convert response to JSON string if needed
                 if isinstance(response, dict):
@@ -475,10 +463,8 @@ class JRPCCommon:
                     
                 # Send via appropriate mechanism
                 if server and client:
-                    print(f"Sending server response to client {client['address']}")
                     server.send_message(client, response)
                 else:
-                    print("Returning client response")
                     return response
                     
         except json.JSONDecodeError as e:

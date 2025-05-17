@@ -57,7 +57,6 @@ class JRPCServer(JRPCCommon):
     def message_received(self, client, server, message):
         """Handle incoming messages"""
         try:
-            print(f"Server received message from {client['address']}")
             # Start message processing in a thread to avoid blocking
             import threading
             thread = threading.Thread(
@@ -76,7 +75,6 @@ class JRPCServer(JRPCCommon):
         try:
             response = self.process_incoming_message(message, client, server)
             if response:
-                print(f"Sending response back")
                 server.send_message(client, response)
         except Exception as e:
             print(f"Error processing message: {e}")

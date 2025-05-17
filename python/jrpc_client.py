@@ -77,7 +77,6 @@ class JRPCClient(JRPCCommon):
                     if hasattr(self, 'ws') and self.ws:
                         message = self.ws.recv()
                         if message:
-                            print(f"Client received: {message}")
                             self.process_incoming_message(message)
                     else:
                         # Connection closed
