@@ -91,27 +91,12 @@ class JRPCServer(JRPCCommon):
         """
         self.wss.send_message(connection, message)
     
-    def setup_remote(self, remote, ws):
+    def send_request_to_connection(self, connection, message):
         """
-        Setup a remote connection.
+        Send a request to a client connection.
         
         Args:
-            remote: The remote to setup
-            ws: WebSocket connection
+            connection: The connection to send to
+            message: The message to send
         """
-        # Expose our classes to the remote
-        if self.classes:
-            for cls_obj in self.classes:
-                for method_name, method in cls_obj.items():
-                    if 'methods' not in remote:
-                        remote['methods'] = {}
-                    remote['methods'][method_name] = method
-        
-        # Request the remote's exposed methods
-        request = {
-            'jsonrpc': '2.0',
-            'method': 'system.listComponents',
-            'params': [],
-            'id': 1
-        }
-        self.wss.send_message(ws, json.dumps(request))
+        self.wss.send_message(connection, message)

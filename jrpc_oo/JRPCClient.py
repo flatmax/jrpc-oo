@@ -62,9 +62,8 @@ class JRPCClient(JRPCCommon):
         remote['connection'] = ws  # Use consistent key for connection
         remote['client'] = self
         
-        # Request the list of available methods
-        self.send_request('system.listComponents', [], lambda err, result: 
-                         self.setup_fns(list(result.keys()), remote) if not err else None)
+        # Setup the remote and request components
+        self.setup_remote(remote, ws)
     
     def on_message(self, ws, message):
         """
@@ -82,6 +81,16 @@ class JRPCClient(JRPCCommon):
         
         Args:
             connection: WebSocket connection
+            message: The message to send
+        """
+        connection.send(message)
+        
+    def send_request_to_connection(self, connection, message):
+        """
+        Send a request to a WebSocket connection.
+        
+        Args:
+            connection: The connection to send to
             message: The message to send
         """
         connection.send(message)
@@ -106,7 +115,11 @@ class JRPCClient(JRPCCommon):
             data: The parsed JSON-RPC response
         """
         request_id = data.get('id')
-        if request_id in self.pending_requests:
+        if request_id == 1 and 'result' in data:
+            # Handle system.listComponents response
+            result = data['result']
+            self.setup_fns(list(result.keys()), remote)
+        elif request_id in self.pending_requests:
             callback = self.pending_requests[request_id]['callback']
             if 'error' in data:
                 callback(data['error'], None)

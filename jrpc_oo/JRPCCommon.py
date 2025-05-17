@@ -112,15 +112,16 @@ class JRPCCommon:
             remote: The remote to setup
             ws: The websocket for transmission
         """
-        # Set up transmitter - implementation will be in subclasses
-        
         # Expose registered classes
         if self.classes:
             for cls in self.classes:
-                # Expose the class to the remote
-                pass
+                for method_name, method in cls.items():
+                    if 'methods' not in remote:
+                        remote['methods'] = {}
+                    remote['methods'][method_name] = method
                 
         # Call system.listComponents to get available methods
+        self.request_remote_components(remote, ws)
     
     def transmit(self, msg, next_func):
         """
@@ -370,6 +371,36 @@ class JRPCCommon:
         if uuid_to_remove:
             self.rm_remote(None, uuid_to_remove)
         
+    def request_remote_components(self, remote, connection):
+        """
+        Request the component list from a remote.
+        
+        Args:
+            remote: The remote to request components from
+            connection: The connection object to send the request through
+        """
+        # Create the standard request
+        request = {
+            'jsonrpc': '2.0',
+            'method': 'system.listComponents',
+            'params': [],
+            'id': 1
+        }
+        
+        # Send the request (implemented differently in subclasses)
+        self.send_request_to_connection(connection, json.dumps(request))
+    
+    def send_request_to_connection(self, connection, message):
+        """
+        Send a request to a specific connection.
+        Must be implemented by subclasses.
+        
+        Args:
+            connection: The connection to send to
+            message: The message to send
+        """
+        raise NotImplementedError("Subclasses must implement send_request_to_connection")
+    
     def start_background_thread(self, target):
         """
         Start a background thread for the given target.
