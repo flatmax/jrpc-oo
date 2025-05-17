@@ -1,19 +1,18 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jrpc-oo"
+name = "jrpc_oo"
 version = "0.1.0"
 description = "Python implementation of JRPC-OO for WebSocket RPC communication"
 readme = "README.md"
 authors = [
     {name = "Flatmax", email = "example@example.com"}
 ]
-license = {text = "BSD 3-Clause"}
+license = "BSD-3-Clause"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
 ]
 requires-python = ">=3.8"
@@ -30,9 +29,9 @@ dev = [
     "black",
 ]
 
+# Don't look for a 'python' directory - these are modules in the current directory
 [tool.setuptools]
-package-dir = {"" = "."}
-packages = ["python"]
+py-modules = ["ExposeClass", "JRPCClient", "JRPCCommon", "JRPCServer"]
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]

@@ -11,6 +11,7 @@ import os
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Use absolute import instead of relative import
 from JRPCServer import JRPCServer
 
 class TestClass:
