@@ -19,10 +19,13 @@ from python.jrpc_common import JRPCCommon
 from python.debug_utils import debug_log
 
 class JRPCClient(JRPCCommon):
-
-    ws = None
     # Override parent class variables
     is_client = True
+    
+    def __init__(self, host='localhost', port=9000, use_ssl=False, debug=False):
+        super().__init__(host=host, port=port, use_ssl=use_ssl, debug=debug)
+        self.ws = None
+        self.pending_responses = {}
 
     def setup_ssl(self):
         """Setup SSL context for client"""
@@ -33,9 +36,10 @@ class JRPCClient(JRPCCommon):
     def connect(self):
         """Connect to the WebSocket server"""
         try:
+            print(f"Connecting to {self.uri}")
             self.ws = create_connection(
                 self.uri,
-                sslopt={"context": self.ssl_context} if self.ssl_context else None
+                sslopt={"context": self.ssl_context} if self.use_ssl else None
             )
             
             # Initial connection setup
@@ -44,8 +48,7 @@ class JRPCClient(JRPCCommon):
             # Start message processing thread
             import threading
             self.message_thread = threading.Thread(
-                target=self.process_incoming_messages,
-                args=(self.ws,),
+                target=self.receive_messages,
                 daemon=True
             )
             self.message_thread.start()
@@ -61,47 +64,39 @@ class JRPCClient(JRPCCommon):
             
         except Exception as e:
             debug_log(f"Connection failed: {e}", self.debug)
-            if hasattr(self, 'message_thread'):
+            if hasattr(self, 'message_thread') and hasattr(self, 'ws') and self.ws:
                 self.ws.close()
             return False
+            
+    def receive_messages(self):
+        """Continuously receive messages from the server"""
+        try:
+            print("Starting client message receiver thread")
+            while True:
+                try:
+                    if hasattr(self, 'ws') and self.ws:
+                        message = self.ws.recv()
+                        if message:
+                            print(f"Client received: {message}")
+                            self.process_incoming_message(message)
+                    else:
+                        # Connection closed
+                        print("WebSocket connection closed")
+                        break
+                except Exception as e:
+                    print(f"Error receiving message: {str(e)}")
+                    if not hasattr(self, 'ws') or not self.ws:
+                        break
+                    time.sleep(0.1)
+                    
+        except Exception as e:
+            print(f"Fatal error in receive_messages: {e}")
 
     def close(self):
         """Close the connection"""
-        if self.ws:
+        if hasattr(self, 'ws') and self.ws:
             self.ws.close()
             self.ws = None
-            self.pending_requests.clear()
-
-    def process_incoming_messages(self, websocket):
-        """Process incoming messages from the websocket"""
-        try:
-            debug_log("Client message processing thread started", self.debug)
-            while True:
-                try:
-                    message = websocket.recv()
-                    debug_log(f"Client received raw message: {message}", self.debug)
-                    
-                    # Try to parse JSON
-                    try:
-                        msg_data = json.loads(message)
-                        debug_log(f"Client parsed message: {json.dumps(msg_data, indent=2)}", self.debug)
-                    except json.JSONDecodeError:
-                        debug_log(f"Client received non-JSON message: {message}", self.debug)
-                    
-                    # Process using common handler
-                    response = self.process_incoming_message(message)
-                    
-                    # Send response if needed
-                    if response and isinstance(message, dict) and 'method' in message:
-                        debug_log(f"Client sending response: {response}", self.debug)
-                        websocket.send(response)
-                        
-                except Exception as e:
-                    debug_log(f"Error in message processing loop: {e}", self.debug)
-                    if not websocket.connected:
-                        debug_log("WebSocket disconnected, exiting loop", self.debug)
-                        break
-                    
-        except Exception as e:
-            debug_log(f"Fatal error in message processing thread: {e}", self.debug)
+        if hasattr(self, 'pending_responses'):
+            self.pending_responses.clear()
 

@@ -77,6 +77,8 @@ class JRPCCommon:
                 for method in methods:
                     method_name = f"{class_name}.{method}"
                     components[method_name] = True
+                    debug_log(f"Added method to component list: {method_name}", self.debug)
+        debug_log(f"Complete component list: {components}", self.debug)
         return components
 
     class System:
@@ -101,33 +103,26 @@ class JRPCCommon:
                 debug_log("handle_message: Invalid JSON-RPC version", self.debug)
                 return self.error_response(-32600, 'Invalid Request', message_data.get('id'))
 
-            # Handle discovery response
+            # Check if this is a response
+            if ('result' in message_data or 'error' in message_data) and 'id' in message_data:
+                msg_id = message_data.get('id')
+                debug_log(f"Received response for request ID: {msg_id}", self.debug)
+                if hasattr(self, 'pending_responses'):
+                    debug_log(f"Storing response in pending_responses", self.debug)
+                    self.pending_responses[msg_id] = message_data
+                return None  # Don't send a response to a response
+            
+            # Handle method calls
             if message_data.get('method') == 'system.listComponents':
                 debug_log("Received listComponents request", self.debug)
-                if self.is_server:
-                    # Server: Process request and respond
-                    response = self.handle_request(message_data)
-                    response_json = json.dumps(response)
-                    debug_log(f"Server sending response: {response_json}", self.debug)
-                    if hasattr(self, 'server') and hasattr(self, 'ws'):
-                        self.server.send_message(self.ws, response_json)
-                    else:
-                        self.send_message(response_json)
-                    
-                    # Now do server component discovery
-                    debug_log("discover_components calling", self.debug)
-                    success = self.discover_components()
-                    debug_log("discover_components called", self.debug)
-                else:
-                    # Client: Process response and set ready event
-                    debug_log("Client processing listComponents response", self.debug)
-                    response = self.handle_request(message_data)
-                    if response:
-                        self.send_message(response)
-                        # Only now set the connection ready event
-                        self.connection_ready_event.set()
-                        debug_log("Client connection_ready_event set", self.debug)
-                return None
+                # Just handle normally - don't do special server discovery
+                return self.handle_request(message_data)
+            elif 'method' in message_data:
+                debug_log(f"handle_message: Processing request for method: {message_data['method']}", self.debug)
+                return self.handle_request(message_data)
+            else:
+                debug_log("handle_message: Invalid message format", self.debug)
+                return self.error_response(-32600, 'Invalid Request', message_data.get('id'))
 
             # Check if this is a response
             if ('result' in message_data or 'error' in message_data) and 'id' in message_data:
@@ -203,17 +198,47 @@ class JRPCCommon:
                     if hasattr(instance, method_name):
                         method_func = getattr(instance, method_name)
                         if callable(method_func):
+                            print(f"Executing method {class_name}.{method_name} with params: {params}")
+                            
                             # Handle wrapped args parameter format from JS client
-                            if isinstance(params, dict) and 'args' in params:
-                                if isinstance(params['args'], list):
-                                    result = method_func(*params['args'])
+                            try:
+                                args = []
+                                kwargs = {}
+                                
+                                if isinstance(params, dict):
+                                    if 'args' in params:
+                                        # This is how js-jrpc sends parameters
+                                        if isinstance(params['args'], list):
+                                            print(f"Unpacking args from list: {params['args']}")
+                                            args = params['args']
+                                        else:
+                                            print(f"Single arg: {params['args']}")
+                                            args = [params['args']]
+                                    else:
+                                        # Handle old-style dict params as kwargs
+                                        kwargs = params
+                                elif isinstance(params, list):
+                                    # Handle direct list as positional args
+                                    print(f"List params: {params}")
+                                    args = params
+                                elif params is not None:
+                                    # Handle single non-dict, non-list param
+                                    print(f"Direct param: {params}")
+                                    args = [params]
+                                
+                                print(f"Calling {method_name} with args={args}, kwargs={kwargs}")
+                                if kwargs:
+                                    result = method_func(**kwargs)
                                 else:
-                                    result = method_func(params['args'])
-                            elif isinstance(params, dict):
-                                result = method_func(**params)
-                            else:
-                                result = method_func(*params)
-                            return self.result_response(result, msg_id)
+                                    result = method_func(*args)
+                                    
+                                print(f"Method execution result: {result}")
+                                return self.result_response(result, msg_id)
+                            except Exception as e:
+                                print(f"Method execution error: {str(e)}")
+                                import traceback
+                                print(f"Traceback: {traceback.format_exc()}")
+                                return self.error_response(-32603, str(e), msg_id)
 
             return self.error_response(-32601, f'Method {method} not found', msg_id)
 
@@ -266,20 +291,40 @@ class JRPCCommon:
         debug_log(f"Sending message: {message}", self.debug)
         
         # Server sends through server.send_message
-        if hasattr(self, 'server') and client:
-            self.server.send_message(client, message)
+        if self.is_server:
+            if hasattr(self, 'server') and hasattr(self.server, 'send_message'):
+                self.server.send_message(client if client else self.ws, message)
+            else:
+                raise RuntimeError("Server not properly initialized for sending")
         # Client sends directly through websocket
         else:
-            self.ws.send(message)
+            if hasattr(self.ws, 'send'):
+                self.ws.send(message)
+            else:
+                raise RuntimeError("Client WebSocket not properly initialized")
 
     def discover_components(self):
         """Discover available components from the remote endpoint"""
         try:
             debug_log("Starting component discovery...", self.debug)
             
-            # Both client and server use call_method to discover components
+            if self.is_server:
+                # Server doesn't need to discover its own components
+                debug_log("Server skipping component discovery", self.debug)
+                self.connection_ready_event.set()
+                return True
+                
+            # Only clients need to discover remote components
             response = self.call_method('system.listComponents')
             debug_log(f"Components discovered: {response}", self.debug)
+            
+            # Set up the server object with callable methods
+            debug_log("Client setting up server methods", self.debug)
+            self.server = {}
+            for method_name in response:
+                debug_log(f"Setting up client method: {method_name}", self.debug)
+                self.setup_method(method_name)
+            
             self.remotes = response
             debug_log(f"Updated remotes dictionary: {self.remotes}", self.debug)
             self.connection_ready_event.set()
@@ -288,6 +333,8 @@ class JRPCCommon:
                 
         except Exception as e:
             debug_log(f"Component discovery failed: {e}", self.debug)
+            import traceback
+            debug_log(traceback.format_exc(), self.debug)
             return False
 
 
@@ -307,19 +354,38 @@ class JRPCCommon:
         debug_log(f"Calling method: {method} with params: {params}", self.debug)
         # Create request
         request, request_id = self.create_request(method, params)
-        debug_log(f"Created request with ID: {request_id}", self.debug)
+        debug_log(f"Created request: {json.dumps(request)}", self.debug)
         
-        result = self.send_and_wait(request, request_id)
-        debug_log(f"Got result for {method}: {result}", self.debug)
-        return result
+        try:
+            result = self.send_and_wait(request, request_id)
+            debug_log(f"Got result for {method}: {result}", self.debug)
+            return result
+        except Exception as e:
+            debug_log(f"Error in call_method: {e}", self.debug)
+            import traceback
+            debug_log(traceback.format_exc(), self.debug)
+            raise RuntimeError(f"Error when calling remote function : {method}")
 
     def send_and_wait(self, request, request_id):
         """Send a request and wait for response"""
         try:
             debug_log(f"send_and_wait: Sending request {request_id}", self.debug)
-            self.send_message(request, client=self.ws if hasattr(self, 'server') else None)
             
-            # For server, use server.send_message instead of direct recv
+            # Send the message depending on client or server mode
+            if self.is_client:
+                # Client mode - direct websocket send
+                if hasattr(self.ws, 'send'):
+                    self.ws.send(json.dumps(request))
+                else:
+                    raise RuntimeError("Client WebSocket not properly initialized")
+            else:
+                # Server mode - use server's send_message method
+                if hasattr(self, 'server') and hasattr(self.server, 'send_message'):
+                    self.server.send_message(self.ws, json.dumps(request))
+                else:
+                    raise RuntimeError("Server not properly initialized for sending")
+            
+            # Setup for response handling
             if not hasattr(self, 'pending_responses'):
                 self.pending_responses = {}
                 
@@ -348,7 +414,7 @@ class JRPCCommon:
             server: Optional server instance (for server-side)
         """
         try:
-            debug_log(f"Processing incoming message: {message}", self.debug)
+            print(f"Processing incoming message: {message}")
             
             # Store client/server refs if provided (server-side)
             if client and server:
@@ -367,7 +433,7 @@ class JRPCCommon:
                     else:
                         msg_data = message
                 except json.JSONDecodeError as e:
-                    debug_log(f"JSON decode error: {e}", self.debug)
+                    print(f"JSON decode error: {e}")
                     return {
                         "jsonrpc": "2.0",
                         "error": {"code": -32700, "message": f"Parse error: {str(e)}"},
@@ -384,14 +450,14 @@ class JRPCCommon:
                 return None
                 
             if not isinstance(msg_data, dict):
-                debug_log("Invalid message format - not an object", self.debug)
+                print("Invalid message format - not an object")
                 return {
                     "jsonrpc": "2.0",
                     "error": {"code": -32700, "message": "Invalid message format - not a JSON object"},
                     "id": None
                 }
                 
-            debug_log(f"Processed message data: {msg_data}", self.debug)
+            print(f"Processed message data: {json.dumps(msg_data)}")
             
             # Process message and get response
             response = self.handle_message(msg_data)
@@ -401,7 +467,7 @@ class JRPCCommon:
                 return None
                 
             if response:  # Only send response if one was generated
-                debug_log(f"Generated response: {response}", self.debug)
+                print(f"Generated response: {response}")
                 
                 # Convert response to JSON string if needed
                 if isinstance(response, dict):
@@ -409,10 +475,10 @@ class JRPCCommon:
                     
                 # Send via appropriate mechanism
                 if server and client:
-                    debug_log("Sending server response", self.debug)
+                    print(f"Sending server response to client {client['address']}")
                     server.send_message(client, response)
                 else:
-                    debug_log("Returning client response", self.debug)
+                    print("Returning client response")
                     return response
                     
         except json.JSONDecodeError as e:
@@ -437,3 +503,26 @@ class JRPCCommon:
                 f"{class_name}.{method}", args
             )
         })()
+    def setup_method(self, method_name):
+        """Set up a callable method proxy for the remote method"""
+        debug_log(f"Setting up method proxy for: {method_name}", self.debug)
+        
+        def method_proxy(*args):
+            debug_log(f"Calling remote method: {method_name} with args: {args}", self.debug)
+            try:
+                # Format args the way JavaScript client expects
+                payload = {'args': args}
+                debug_log(f"Sending payload: {payload}", self.debug)
+                result = self.call_method(method_name, payload)
+                debug_log(f"Result from {method_name}: {result}", self.debug)
+                return result
+            except Exception as e:
+                debug_log(f"Error calling {method_name}: {e}", self.debug)
+                import traceback
+                debug_log(f"Traceback: {traceback.format_exc()}", self.debug)
+                console_msg = f"Error when calling remote function : {method_name}"
+                print(console_msg)
+                raise RuntimeError(console_msg)
+        
+        # Store the method in the server dictionary
+        self.server[method_name] = method_proxy

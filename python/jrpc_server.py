@@ -36,6 +36,12 @@ class JRPCServer(JRPCCommon):
         client_id = str(id(client))
         self.ws = client  # Store client info
         self.server = server  # Store server reference
+        
+        # Give all registered instances access to the server and client
+        for class_name, instance in self.instances.items():
+            if hasattr(instance, 'set_rpc'):
+                instance.set_rpc(self)
+                
         debug_log(f"New client connected: {client_id}", self.debug)
         debug_log(f"Server has registered instances: {list(self.instances.keys())}", self.debug)
 
@@ -51,17 +57,31 @@ class JRPCServer(JRPCCommon):
     def message_received(self, client, server, message):
         """Handle incoming messages"""
         try:
-            debug_log(f"Server received message from {client['address']}: {message}", self.debug)
-            # Start message processing in a thread
+            print(f"Server received message from {client['address']}")
+            # Start message processing in a thread to avoid blocking
             import threading
             thread = threading.Thread(
-                target=self.process_incoming_message,
+                target=self.process_message_thread,
                 args=(message, client, server),
                 daemon=True
             )
             thread.start()
         except Exception as e:
-            debug_log(f"Error in server message_received: {e}", self.debug)
+            print(f"Error in server message_received: {e}")
+            import traceback
+            print(traceback.format_exc())
+            
+    def process_message_thread(self, message, client, server):
+        """Process message in a separate thread"""
+        try:
+            response = self.process_incoming_message(message, client, server)
+            if response:
+                print(f"Sending response back")
+                server.send_message(client, response)
+        except Exception as e:
+            print(f"Error processing message: {e}")
+            import traceback
+            print(traceback.format_exc())
 
     def start(self):
         """Start the WebSocket server"""
