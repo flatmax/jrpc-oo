@@ -8,9 +8,9 @@ import os
 import time
 
 # Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from JRPCClient import JRPCClient
+from jrpc_oo.JRPCClient import JRPCClient
 
 class TestClass:
     """Test class with methods to expose over RPC."""

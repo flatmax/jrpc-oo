@@ -5,6 +5,8 @@ JSON-RPC Server implementation over WebSockets.
 import json
 import ssl
 import threading
+import os
+import sys
 from websocket_server import WebsocketServer
 from .JRPCCommon import JRPCCommon
 
@@ -14,29 +16,54 @@ class JRPCServer(JRPCCommon):
     Similar to the JavaScript JRPCServer.
     """
     
-    def __init__(self, port=9000, remote_timeout=60, ssl=True):
+    def __init__(self, port=9000, remote_timeout=60, use_ssl=True):
         """
         Initialize the server.
         
         Args:
             port: The port number to use for socket binding
             remote_timeout: The maximum timeout of connection
-            ssl: Set False for regular connection, True for secure connection
+            use_ssl: Set False for regular connection, True for secure connection
         """
         super().__init__()
         self.remote_timeout = remote_timeout
         
-        # Setup the WebSocket server
-        if ssl:
-            # Create SSL context
-            ssl_context = {
-                'certfile': './cert/server.crt',
-                'keyfile': './cert/server.key'
-            }
-            self.wss = WebsocketServer(port=port, host='0.0.0.0', 
-                                     loglevel=0, ssl_context=ssl_context)
-        else:
-            self.wss = WebsocketServer(port=port, host='0.0.0.0', loglevel=0)
+        # Check which version of websocket-server we're using
+        try:
+            # Setup the WebSocket server with SSL if supported
+            if use_ssl:
+                try:
+                    # Try to find certificate files
+                    cert_path = './cert/server.crt'
+                    key_path = './cert/server.key'
+                    
+                    if not os.path.exists(cert_path) or not os.path.exists(key_path):
+                        print(f"Warning: SSL certificates not found at {cert_path} and {key_path}")
+                        print("Falling back to non-SSL mode")
+                        self.wss = WebsocketServer(host='0.0.0.0', port=port)
+                    else:
+                        # Try to initialize with SSL
+                        try:
+                            # Some websocket_server versions support ssl_context parameter
+                            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                            ssl_context.load_cert_chain(cert_path, key_path)
+                            self.wss = WebsocketServer(host='0.0.0.0', port=port, ssl=ssl_context)
+                            print("Server running with SSL support")
+                        except TypeError:
+                            # If ssl parameter is not supported
+                            print("Warning: This version of websocket_server doesn't support SSL")
+                            print("Connection will be insecure")
+                            self.wss = WebsocketServer(host='0.0.0.0', port=port)
+                except Exception as e:
+                    print(f"SSL initialization error: {e}")
+                    print("Falling back to non-SSL mode")
+                    self.wss = WebsocketServer(host='0.0.0.0', port=port)
+            else:
+                # Non-SSL mode
+                self.wss = WebsocketServer(host='0.0.0.0', port=port)
+        except Exception as e:
+            print(f"Error initializing WebSocket server: {e}")
+            raise
         
         # Set up event handlers
         self.wss.set_fn_new_client(self.on_new_client)

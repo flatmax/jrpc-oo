@@ -124,7 +124,7 @@ For secure WebSocket connections, you'll need to provide SSL certificates:
 
 ```python
 # Server with SSL
-server = JRPCServer(9000, ssl=True)  # Will look for cert/server.crt and cert/server.key
+server = JRPCServer(9000, use_ssl=True)  # Will look for cert/server.crt and cert/server.key
 
 # Client with SSL
 client = JRPCClient("wss://localhost:9000")  # Note the wss:// protocol
