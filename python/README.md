@@ -85,9 +85,12 @@ client.connect()
 client_obj = ClientClass()
 client.add_class(client_obj)
 
-# Call server methods
-result = client.send_request("MyClass.hello", ["World"], 
-                            lambda err, result: print(f"Result: {result}" if not err else f"Error: {err}"))
+# Call server methods using call[] syntax (similar to JS implementation)
+client.call["MyClass.hello"]("World").then(
+    lambda result: print(f"Result: {result}")
+).catch(
+    lambda err: print(f"Error: {err}")
+)
 
 # Keep client running to respond to server calls
 try:
