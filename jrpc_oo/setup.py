@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Setup script for jrpc-oo Python modules."""
 
 from setuptools import setup

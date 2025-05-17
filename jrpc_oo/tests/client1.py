@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test client 1 for JRPC-OO Python implementation.
 Similar to Client1.js
