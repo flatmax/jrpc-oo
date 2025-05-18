@@ -4,6 +4,7 @@ Equivalent to JavaScript JRPCServer class.
 """
 
 import threading
+import time
 from typing import Optional, Dict, Any
 from websocket_server import WebsocketServer
 from .JRPCCommon import JRPCCommon
@@ -57,9 +58,13 @@ class JRPCServer(JRPCCommon):
             if hasattr(self, 'remotes') and self.remotes and hasattr(self, 'classes') and self.classes:
                 current_time = time.time()
                 
+                # Make sure _last_sync_time is initialized
+                if not hasattr(self, '_last_sync_time'):
+                    self._last_sync_time = {}
+                    
                 for remote_id, remote in self.remotes.items():
                     # Skip if we've synced with this remote recently
-                    if hasattr(self, '_last_sync_time') and remote_id in self._last_sync_time:
+                    if remote_id in self._last_sync_time:
                         last_sync = self._last_sync_time[remote_id]
                         if current_time - last_sync < 5:  # Don't re-sync more than once every 5 seconds
                             print(f"Skipping re-sync for {remote_id} - too soon since last sync")
@@ -118,31 +123,6 @@ class JRPCServer(JRPCCommon):
                 if hasattr(self, 'check_required_functions'):
                     self.check_required_functions()
     
-    def __init__(self, port: int = 9000, remote_timeout: int = 60):
-        """
-        Initialize a new JRPC server.
-        
-        Args:
-            port: Port number for the WebSocket server
-            remote_timeout: Timeout for remote calls in seconds
-        """
-        super().__init__()
-        self.remote_timeout = remote_timeout
-        self.port = port
-        
-        # Create WebSocket server
-        self.wss = WebsocketServer(host='0.0.0.0', port=port)
-        
-        # Set up event handlers
-        self.wss.set_fn_new_client(self._on_new_client)
-        self.wss.set_fn_message_received(self._on_message)
-        self.wss.set_fn_client_left(self._on_client_left)
-        
-        # Client -> Remote mapping
-        self.client_remotes = {}
-        
-        # Server thread
-        self._server_thread = None
     
     def _on_new_client(self, client, server):
         """

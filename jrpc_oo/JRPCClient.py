@@ -124,9 +124,13 @@ class JRPCClient(JRPCCommon):
             if hasattr(self, 'remotes') and self.remotes and hasattr(self, 'classes') and self.classes:
                 current_time = time.time()
                 
+                # Make sure _last_sync_time is initialized
+                if not hasattr(self, '_last_sync_time'):
+                    self._last_sync_time = {}
+                
                 for remote_id, remote in self.remotes.items():
                     # Skip if we've synced with this remote recently
-                    if hasattr(self, '_last_sync_time') and remote_id in self._last_sync_time:
+                    if remote_id in self._last_sync_time:
                         last_sync = self._last_sync_time[remote_id]
                         if current_time - last_sync < 5:  # Don't re-sync more than once every 5 seconds
                             print(f"Skipping re-sync for {remote_id} - too soon since last sync")

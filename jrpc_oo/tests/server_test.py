@@ -19,6 +19,8 @@ class JRPCTestServer(JRPCServer):
         self.has_remote = False
         self.functions_ready = False
         self.required_functions = ['TestClass.uniqueFn1', 'TestClass.uniqueFn2', 'TestClass.commonFn']
+        # Add explicit initialization of _last_sync_time for this subclass
+        self._last_sync_time = {}
     
     def remote_is_up(self):
         """Override to mark when a remote connects"""
@@ -186,14 +188,16 @@ if __name__ == "__main__":
                         # Try to actively sync with remotes - but only once every 5 seconds
                         current_time = time.time()
                         for remote_id, remote in jrpc_server.remotes.items():
+                            # Make sure _last_sync_time is initialized
+                            if not hasattr(jrpc_server, '_last_sync_time'):
+                                jrpc_server._last_sync_time = {}
+                                
                             # Only sync if we haven't done so recently
-                            if not hasattr(jrpc_server, '_last_sync_time') or remote_id not in jrpc_server._last_sync_time or \
+                            if remote_id not in jrpc_server._last_sync_time or \
                                current_time - jrpc_server._last_sync_time[remote_id] >= 5:
                                 print(f"Requesting components from remote {remote_id}")
                                 try:
                                     # Update last sync time
-                                    if not hasattr(jrpc_server, '_last_sync_time'):
-                                        jrpc_server._last_sync_time = {}
                                     jrpc_server._last_sync_time[remote_id] = current_time
                                     
                                     remote.call('system.listComponents', [], lambda err, result: 
