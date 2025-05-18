@@ -65,18 +65,25 @@ class ExposeClass:
         for fn_name in fns:
             method_name = fn_name.split('.')[1]
             
-            # Create a wrapper function for each method
-            def create_wrapper(method_name):
-                def wrapper(params, next_callback):
-                    try:
-                        args = params.get('args', [])
-                        result = getattr(cls_instance, method_name)(*args)
-                        next_callback(None, result)
-                    except Exception as e:
-                        print(f"Failed: {str(e)}")
-                        next_callback(str(e), None)
-                return wrapper
+            # Create a wrapper function for this specific method (using closure)
+            current_method_name = method_name  # Capture current method name in this scope
+            current_fn_name = fn_name          # Capture current function name in this scope
             
-            fns_exp[fn_name] = create_wrapper(method_name)
+            def wrapper(params, next_callback):
+                try:
+                    args = params.get('args', [])
+                    print(f"Calling {current_fn_name} with args: {args}")
+                    method = getattr(cls_instance, current_method_name)
+                    result = method(*args)
+                    print(f"{current_fn_name} returned: {result}")
+                    next_callback(None, result)
+                except Exception as e:
+                    print(f"Failed calling {current_fn_name}: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+                    next_callback(str(e), None)
+            
+            # Assign the wrapper directly without another layer of function
+            fns_exp[fn_name] = wrapper
         
         return fns_exp

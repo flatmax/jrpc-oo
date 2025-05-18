@@ -8,10 +8,8 @@ import time
 import sys
 import os
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from JRPCClient import JRPCClient
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from jrpc_oo.JRPCClient import JRPCClient
 
 class TestClass:
     def uniqueFn1(self, i, str_param):
@@ -20,9 +18,9 @@ class TestClass:
         print('args:', i, str_param)
         return i + 1
     
-    def commonFn(self, *args):
+    def commonFn(self, i, str_param=None):
         """Common function implemented by both clients"""
-        print('args:', args)
+        print('commonFn called with:', i, str_param)
         return 'Client 1'
 
 if __name__ == "__main__":

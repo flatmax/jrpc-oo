@@ -17,12 +17,37 @@ class JRPCTestServer(JRPCServer):
     def __init__(self, port=9000, remote_timeout=60):
         super().__init__(port, remote_timeout)
         self.has_remote = False
+        self.functions_ready = False
+        self.required_functions = ['TestClass.uniqueFn1', 'TestClass.uniqueFn2', 'TestClass.commonFn']
     
     def remote_is_up(self):
         """Override to mark when a remote connects"""
         super().remote_is_up()
         self.has_remote = True
         print("First client connected!")
+    
+    def setup_done(self):
+        """Called when remote functions are set up"""
+        super().setup_done()
+        
+        # Check if any of the required functions are available
+        # We'll test with whatever function is available first
+        available_funcs = 0
+        for func in self.required_functions:
+            if func in self.call:
+                available_funcs += 1
+                
+        if available_funcs > 0:
+            # We have at least some functions available
+            print(f"Found {available_funcs} required functions, ready to start testing")
+            self.functions_ready = True
+        
+        if all_ready:
+            print("All required remote functions are available!")
+            self.functions_ready = True
+        else:
+            available = list(self.call.keys())
+            print(f"Waiting for functions: {[f for f in self.required_functions if f not in available]}")
 
 
 class TestClass:
@@ -99,12 +124,14 @@ if __name__ == "__main__":
     print("Server running on port 9000")
     print("Waiting for clients to connect...")
     
-    # Run the multi-client test periodically, but only when a client is connected
+    # Run the multi-client test periodically, but only when required functions are ready
     try:
         while True:
             time.sleep(1)
-            if jrpc_server.has_remote:
+            if jrpc_server.functions_ready:
                 tc.multi_client_test(jrpc_server)
+            elif jrpc_server.has_remote:
+                print("Remote connected but waiting for functions to be ready...")
     except KeyboardInterrupt:
         print("\nShutting down server")
         jrpc_server.stop()

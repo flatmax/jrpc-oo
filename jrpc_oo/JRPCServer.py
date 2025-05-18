@@ -14,6 +14,11 @@ class JRPCServer(JRPCCommon):
     JRPC server implementation that handles WebSocket connections.
     """
     
+    def setup_done(self):
+        """Called when the remote setup is complete."""
+        print("JRPCServer: Remote functions setup complete")
+        super().setup_done()
+    
     def __init__(self, port: int = 9000, remote_timeout: int = 60):
         """
         Initialize a new JRPC server.
@@ -75,10 +80,11 @@ class JRPCServer(JRPCCommon):
             server: WebSocket server instance
             message: Received message
         """
+        print(f"Server received message from client {client['id']}: {message[:100]}{'...' if len(message) > 100 else ''}")
         if client['id'] in self.client_remotes:
             remote, ws_wrapper = self.client_remotes[client['id']]
-            if ws_wrapper.on_message:
-                ws_wrapper.on_message(message)
+            if hasattr(remote, "receive"):
+                remote.receive(message)  # Pass directly to remote for processing
     
     def _on_client_left(self, client, server):
         """

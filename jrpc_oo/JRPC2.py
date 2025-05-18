@@ -62,6 +62,13 @@ class JRPC2:
         Args:
             data: JSON-RPC 2.0 message data
         """
+        print(f"JRPC2: Received message: {data}")
+        
+        # Handle response messages even if jsonrpc field is missing
+        if 'result' in data or 'error' in data:
+            self._handle_response(data)
+            return
+            
         if 'jsonrpc' not in data or data['jsonrpc'] != '2.0':
             self._send_error(data.get('id'), -32600, "Invalid Request")
             return
@@ -125,12 +132,17 @@ class JRPC2:
             data: Response data
         """
         response_id = data.get('id')
+        print(f"Got response for id {response_id}, registered requests: {list(self.requests.keys())}")
         if response_id in self.requests:
             callback = self.requests.pop(response_id)
             if 'result' in data:
+                print(f"Calling callback with result for id {response_id}")
                 callback(None, data['result'])
             elif 'error' in data:
+                print(f"Calling callback with error for id {response_id}: {data['error']}")
                 callback(data['error'], None)
+        else:
+            print(f"No callback registered for response id {response_id}")
     
     def _send_result(self, request_id: Union[str, int], result: Any):
         """Send a successful response.
@@ -192,6 +204,7 @@ class JRPC2:
             'params': params
         }
         
+        print(f"Calling remote method {method} with id {request_id}")
         self._transmit(json.dumps(request))
     
     def expose(self, methods: Dict[str, Callable]):
@@ -204,4 +217,15 @@ class JRPC2:
     
     def upgrade(self):
         """Perform any necessary upgrade steps after connection."""
-        pass
+        # Define system.listComponents function that returns an object with method names
+        def system_list_components(params, next_callback):
+            print("system.listComponents called by remote")
+            # Create an object where each key is a method name with an empty object as value
+            # This matches the JavaScript implementation behavior
+            result = {name: {} for name in self.methods.keys()}
+            print(f"Returning methods: {list(result.keys())}")
+            next_callback(None, result)
+            
+        # Add system.listComponents method which is required for the JRPC-OO protocol
+        self.methods['system.listComponents'] = system_list_components
+        print(f"JRPC2: Exposed methods after upgrade: {list(self.methods.keys())}")

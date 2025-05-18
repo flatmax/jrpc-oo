@@ -22,15 +22,28 @@ class Promise:
                 self._reject(e)
     
     def _resolve(self, value):
-        for callback in self.then_callbacks:
+        """Resolve the promise with a value and process callbacks"""
+        print(f"Promise resolving with value: {value}")
+        # Make a copy of callbacks to avoid modification during iteration
+        callbacks = self.then_callbacks.copy()
+        self.then_callbacks = []
+        
+        for callback in callbacks:
             try:
                 result = callback(value)
                 if hasattr(result, 'then'):
+                    # Chain promise resolutions
                     result.then(
                         lambda val: self._resolve(val),
                         lambda err: self._reject(err)
                     )
+                # If no then method but still a result, continue with that result
+                elif result is not None:
+                    self._resolve(result)
             except Exception as e:
+                print(f"Promise callback error: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 self._reject(e)
     
     def _reject(self, reason):
@@ -105,11 +118,32 @@ class JRPCCommon:
         
         remote.upgrade()
         
+        # Set up the on_message handler to receive messages
+        if hasattr(ws, 'on_message'):
+            ws.on_message = lambda message: remote.receive(message)
+        
+        # Set up on_close handler
+        if hasattr(ws, 'on_close'):
+            ws.on_close = lambda: self.rm_remote(None, remote.uuid)
+            
         # List available components from the remote
-        remote.call('system.listComponents', [], lambda err, result: 
-            self.setup_fns(list(result.keys()), remote) if result else 
-            print(f"Error listing components: {err}")
-        )
+        def on_components_listed(err, result):
+            print(f"system.listComponents callback - err: {err}, result: {result}")
+            if err:
+                print(f"Error listing components: {err}")
+                return
+            
+            if result:
+                method_names = list(result.keys())
+                print(f"Remote components available: {method_names}")
+                self.setup_fns(method_names, remote)
+                print("setup_fns completed")
+            else:
+                print("No components returned from remote")
+        
+        print("Calling system.listComponents")
+        # Use an empty array for parameters to match JS implementation
+        remote.call('system.listComponents', [], on_components_listed)
         
         return remote
     
@@ -181,7 +215,7 @@ class JRPCCommon:
         # Create RPC functions for each method name
         for fn_name in fn_names:
             # Create a function in remote.rpcs that returns a Promise
-            def create_fn(fn_name):
+            def create_fn(fn_name=fn_name):  # Use default parameter to create closure
                 def fn_call(*args):
                     def executor(resolve, reject):
                         def callback(err, result):
@@ -189,10 +223,12 @@ class JRPCCommon:
                                 print(f"Error when calling remote function: {fn_name}")
                                 reject(err)
                             else:
+                                print(f"Remote function {fn_name} returned: {result}")
                                 resolve(result)
-                        
+                            
+                        print(f"Calling remote function: {fn_name} with args: {args}")
                         remote.call(fn_name, {'args': args}, callback)
-                    
+                        
                     return Promise(executor)
                 return fn_call
             
@@ -203,13 +239,17 @@ class JRPCCommon:
                 self.call = {}
                 
             if fn_name not in self.call:
-                def create_call_all(fn_name):
+                def create_call_all(fn_name=fn_name):  # Use default parameter to create closure
                     def call_all(*args):
                         promises = []
                         rem_ids = []
                         
+                        print(f"Call all for {fn_name} with args: {args}")
+                        print(f"Available remotes: {list(self.remotes.keys())}")
+                        
                         for rem_id, rem in self.remotes.items():
-                            if hasattr(rem, 'rpcs') and fn_name in rem.rpcs:
+                            if hasattr(rem, 'rpcs') and rem.rpcs and fn_name in rem.rpcs:
+                                print(f"Adding remote {rem_id} to call {fn_name}")
                                 rem_ids.append(rem_id)
                                 promises.append(rem.rpcs[fn_name](*args))
                         
@@ -264,15 +304,20 @@ class JRPCCommon:
                 
                 self.server[fn_name] = error_fn
         
-        # Notify that setup is complete
-        self.setup_done()
+        # For each new function we receive, call setup_done
+        # This ensures the server can know when new functions become available
+        if len(fn_names) > 0:
+            print(f"Calling setup_done from setup_fns with {len(fn_names)} functions: {fn_names}")
+            self.setup_done()
     
     def setup_done(self):
         """
         Called when the setup is complete.
         You should override this function to get a notification once the 'server' variable is ready.
         """
-        pass
+        print("*** setup_done called ***")
+        print("Setup complete. Remote functions available:", list(self.server.keys()))
+        print("Call functions available:", list(self.call.keys()))
     
     def add_class(self, cls_instance, obj_name=None):
         """

@@ -75,8 +75,10 @@ class JRPCClient(JRPCCommon):
             while self._connected and self.ws:
                 try:
                     message = self.ws.recv()
-                    if message and self._ws_wrapper and self._ws_wrapper.on_message:
-                        self._ws_wrapper.on_message(message)
+                    if message:
+                        print(f"Client received raw message: {message[:100]}{'...' if len(message) > 100 else ''}")
+                        if self._ws_wrapper and self._ws_wrapper.on_message:
+                            self._ws_wrapper.on_message(message)
                 except Exception as e:
                     print(f"WebSocket receive error: {str(e)}")
                     self._connected = False
@@ -104,6 +106,11 @@ class JRPCClient(JRPCCommon):
         """
         print("is JRPC-OO.node.js running?")
         print("is the ws url cleared with the browser for access?")
+    
+    def setup_done(self):
+        """Called when the remote setup is complete."""
+        print("JRPCClient: Remote functions setup complete")
+        super().setup_done()
     
     def is_connected(self):
         """
