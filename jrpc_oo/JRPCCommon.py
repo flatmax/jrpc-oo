@@ -73,7 +73,6 @@ class JRPCCommon:
         self.call = {}  # Functions to call on all remotes
         self.remote_timeout = 60  # Default timeout
         self._setup_done_in_progress = False  # Flag to prevent recursive setup_done calls
-        self._last_sync_time = {}  # Track last sync time for each remote
     
     def new_remote(self):
         """
@@ -333,19 +332,11 @@ class JRPCCommon:
             
             # Now make sure our classes are properly exposed to all remotes
             if hasattr(self, 'remotes') and self.remotes and hasattr(self, 'classes') and self.classes:
-                current_time = time.time()
-                
-                # Make sure _last_sync_time is initialized
-                if not hasattr(self, '_last_sync_time'):
-                    self._last_sync_time = {}
-                
                 for remote_id, remote in self.remotes.items():
-                    # Skip if we've synced with this remote recently
-                    if remote_id in self._last_sync_time:
-                        last_sync = self._last_sync_time[remote_id]
-                        if current_time - last_sync < 5:  # Don't re-sync more than once every 5 seconds
-                            print(f"Skipping re-sync for {remote_id} - too soon since last sync")
-                            continue
+                    # Skip if this remote is already fully synced (has rpcs populated)
+                    if hasattr(remote, 'rpcs') and remote.rpcs:
+                        print(f"Skipping re-sync for {remote_id} - already has RPCs")
+                        continue
                     
                     # Re-expose all classes to this remote
                     for cls in self.classes:
@@ -354,14 +345,10 @@ class JRPCCommon:
                     # Force an upgrade to update the remote's method list
                     remote.upgrade()
                     
-                    # Track sync time
-                    self._last_sync_time[remote_id] = current_time
-                    
-                    # Call system.listComponents again to ensure both sides are in sync
-                    print(f"Re-requesting components from remote {remote_id}")
+                    # Call system.listComponents once to ensure both sides are in sync
+                    print(f"Requesting components from remote {remote_id}")
                     remote.call('system.listComponents', [], lambda err, result: 
-                        print(f"Re-sync error: {err}") if err else 
-                        self.process_remote_components(remote_id, result))
+                                print(f"Sync error: {err}") if err else self.process_remote_components(remote_id, result))
             
             print("*** setup_done called ***")
             print("Setup complete. Remote functions available:", list(self.server.keys()))
@@ -369,6 +356,7 @@ class JRPCCommon:
         finally:
             if hasattr(self, '_setup_done_in_progress'):
                 self._setup_done_in_progress = False
+    
     
     def process_remote_components(self, remote_id, result):
         """Process available components from remote"""
