@@ -18,6 +18,13 @@ from .ExposeClass import ExposeClass
 from .JRPC2 import JRPC2
 
 
+class RPCMethodNotFoundError(Exception):
+    """Exception raised when a requested RPC method is not found."""
+    def __init__(self, method_name):
+        self.method_name = method_name
+        super().__init__(f"RPC method not found: {method_name}")
+
+
 class JRPCCommon:
     """Common functionality for JRPC clients and servers."""
     
@@ -227,6 +234,10 @@ class JRPCCommon:
                         if hasattr(r, 'rpcs') and fn_name in r.rpcs:
                             rems.append(r_uuid)
                             promises.append(r.rpcs[fn_name](*args))
+                    
+                    # If no remote has this function, raise a specific error
+                    if not promises:
+                        raise RPCMethodNotFoundError(fn_name)
                     
                     results = await asyncio.gather(*promises, return_exceptions=True)
                     
