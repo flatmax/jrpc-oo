@@ -8,3 +8,4 @@ package-lock.json
 *.egg-info/
 **/__pycache__/
 *.tgz
+**/build

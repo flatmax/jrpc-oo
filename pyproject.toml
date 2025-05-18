@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jrpc_oo"
+version = "0.1.0"
+description = "JSON-RPC OO - Object-oriented JSON-RPC over WebSockets"
+requires-python = ">=3.7"
+dependencies = [
+    "websockets",
+    "asyncio",
+]
+
+[tool.setuptools]
+packages = ["jrpc_oo"]
