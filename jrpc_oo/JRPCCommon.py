@@ -184,8 +184,16 @@ class JRPCCommon:
             print(f"Error listing components: {err}")
             return
             
-        # Result should now be a list of function names directly
-        fn_names = result if isinstance(result, list) else []
+        # Handle various formats the server might return
+        if isinstance(result, dict):
+            # JS servers might return the actual methods object
+            fn_names = list(result.keys())
+        elif isinstance(result, list):
+            # Python servers should return a list of function names
+            fn_names = result
+        else:
+            print(f"Unexpected result type from system.listComponents: {type(result)}")
+            fn_names = []
             
         self.setup_fns(fn_names, remote)
     

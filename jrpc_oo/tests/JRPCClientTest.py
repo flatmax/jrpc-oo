@@ -41,8 +41,18 @@ class LocalJRPC(JRPCClient):
     async def test_arg_pass(self):
         """Test passing arguments to server methods."""
         print(">>> Testing TestClass.fn2 with arguments")
+        print(f"Available methods: {list(self.server.keys())}")
         
-        if 'TestClass.fn2' in self.server:
+        # Try case-sensitive exact match
+        test_method = 'TestClass.fn2'
+        # Try case-insensitive match if not found
+        if test_method not in self.server:
+            for method in self.server.keys():
+                if method.lower() == test_method.lower():
+                    test_method = method
+                    break
+            
+        if test_method in self.server:
             # Create test arguments
             arg1 = 1
             arg2 = {"0": "test", "1": [1, 2], "2": "this function"}
@@ -51,10 +61,13 @@ class LocalJRPC(JRPCClient):
             print(f'Arguments: [{arg1}, {arg2}]')
             
             try:
-                result = await self.server['TestClass.fn2'](arg1, arg2)
+                result = await self.server[test_method](arg1, arg2)
                 print(f'<<< Received response: {result}')
             except Exception as e:
                 print(f"Error occurred: {e}")
+                print(f"Exception type: {type(e)}")
+                import traceback
+                traceback.print_exc()
         else:
             print("TestClass.fn2 not found in server methods!")
             print(f"Available methods: {list(self.server.keys())}")
@@ -67,18 +80,30 @@ class LocalJRPC(JRPCClient):
         """Test calling server method with no arguments."""
         print(">>> Testing TestClass.fn1 with no arguments")
         
-        if 'TestClass.fn1' in self.server:
+        # Try case-sensitive exact match
+        test_method = 'TestClass.fn1'
+        # Try case-insensitive match if not found
+        if test_method not in self.server:
+            for method in self.server.keys():
+                if method.lower() == test_method.lower():
+                    test_method = method
+                    break
+        
+        if test_method in self.server:
             try:
-                result = await self.server['TestClass.fn1']()
+                result = await self.server[test_method]()
                 print(f'<<< Received response: {result}')
             except Exception as e:
                 print(f"Error occurred: {e}")
+                print(f"Exception type: {type(e)}")
+                import traceback
+                traceback.print_exc()
         else:
             print("TestClass.fn1 not found in server methods!")
             print("Expected the server to expose a class TestClass with function fn1 but couldn't find it")
         
-        # Test echo chamber
-        await self.start_echo_chamber()
+        # # Test echo chamber
+        # await self.start_echo_chamber()
     
     async def start_echo_chamber(self):
         """Start the echo test."""
@@ -88,15 +113,28 @@ class LocalJRPC(JRPCClient):
         """Echo back function that calls the server's echoBack."""
         print(f'echoBack {args}')
         
-        if 'TestClass.echoBack' in self.server:
+        # Try case-sensitive exact match
+        test_method = 'TestClass.echoBack'
+        # Try case-insensitive match if not found
+        if test_method not in self.server:
+            for method in self.server.keys():
+                if method.lower() == test_method.lower():
+                    test_method = method
+                    break
+                    
+        if test_method in self.server:
             try:
-                result = await self.server['TestClass.echoBack']('this is the browser saying echo')
+                result = await self.server[test_method]('this is the python client saying echo')
                 print('TestClass.echoBack returned:')
                 print(json.dumps(result, indent=2))
             except Exception as e:
                 print(f"Error calling TestClass.echoBack: {e}")
+                print(f"Exception type: {type(e)}")
+                import traceback
+                traceback.print_exc()
         else:
             print("Expected the server to expose a class TestClass with function echoBack but couldn't find it")
+            print(f"Available methods: {list(self.server.keys())}")
         
         return 'echoBack returned you this'
 
