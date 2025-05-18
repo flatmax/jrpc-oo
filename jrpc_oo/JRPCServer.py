@@ -52,23 +52,42 @@ class JRPCServer(JRPCCommon):
             client: Client information
             server: WebSocket server instance
         """
-        # Create a wrapper for the client that provides WebSocket-like interface
-        class WSWrapper:
-            def __init__(self, client_id, server):
-                self.client_id = client_id
-                self.server = server
-                self.on_message = None
-                self.on_close = None
-                
-            def send(self, message):
-                for client in self.server.clients:
-                    if client['id'] == self.client_id:
-                        self.server.send_message(client, message)
-                        break
+        client_id = client['id']
+        remote = self.new_remote()
+        self.client_remotes[client_id] = remote
         
-        ws_wrapper = WSWrapper(client['id'], server)
-        remote = self.create_remote(ws_wrapper)
-        self.client_remotes[client['id']] = (remote, ws_wrapper)
+        # Set up transmitter function
+        def transmit(message, next_callback):
+            try:
+                server.send_message(client, message)
+                next_callback(False)
+            except Exception as e:
+                print(f"Transmission error: {str(e)}")
+                next_callback(True)
+        
+        # Configure remote
+        remote.jrpc.set_transmitter(transmit)
+        
+        # Expose classes
+        if self.classes:
+            for cls in self.classes:
+                remote.jrpc.expose(cls)
+        remote.jrpc.upgrade()
+        
+        # Notify that a new client connected
+        self.remote_is_up()
+        
+        # Get available components
+        remote.jrpc.call('system.listComponents', [], lambda err, result: 
+                         print(f"Error listing components: {err}") if err else 
+                         self._handle_components(remote, result))
+    
+    def _handle_components(self, remote, result):
+        """Process component list result from client."""
+        if result:
+            method_names = list(result.keys())
+            print(f"Remote components available: {method_names}")
+            self.setup_fns(method_names, remote)
     
     def _on_message(self, client, server, message):
         """
@@ -79,11 +98,10 @@ class JRPCServer(JRPCCommon):
             server: WebSocket server instance
             message: Received message
         """
-        print(f"Server received message from client {client['id']}: {message[:100]}{'...' if len(message) > 100 else ''}")
-        if client['id'] in self.client_remotes:
-            remote, ws_wrapper = self.client_remotes[client['id']]
-            if hasattr(remote, "receive"):
-                remote.receive(message)  # Pass directly to remote for processing
+        client_id = client['id']
+        if client_id in self.client_remotes:
+            remote = self.client_remotes[client_id]
+            remote.jrpc.receive(message)
     
     def _on_client_left(self, client, server):
         """
@@ -93,14 +111,13 @@ class JRPCServer(JRPCCommon):
             client: Client information
             server: WebSocket server instance
         """
-        if client['id'] in self.client_remotes:
-            remote, ws_wrapper = self.client_remotes[client['id']]
-            if ws_wrapper.on_close:
-                ws_wrapper.on_close()
+        client_id = client['id']
+        if client_id in self.client_remotes:
+            remote = self.client_remotes[client_id]
             
-            # Clean up the connection
+            # Clean up
             self.rm_remote(None, remote.uuid)
-            del self.client_remotes[client['id']]
+            del self.client_remotes[client_id]
     
     def start(self, blocking=True):
         """

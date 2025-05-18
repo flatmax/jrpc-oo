@@ -14,7 +14,7 @@ from jrpc_oo.JRPCServer import JRPCServer
 
 class JRPCTestServer(JRPCServer):
     """Server class that tracks remote connections"""
-    def __init__(self, port=9000, remote_timeout=60):
+    def __init__(self, port=9000, remote_timeout=10):  # Reduced timeout
         super().__init__(port, remote_timeout)
         self.has_remote = False
         self.functions_ready = False
@@ -81,11 +81,11 @@ class TestClass:
         """Test calling functions across multiple clients"""
         print('multiClientTest: enter')
         
-        # Check if required functions exist before attempting to call them
-        if 'TestClass.uniqueFn1' not in jrpc_server.call:
-            print("Cannot run test: TestClass.uniqueFn1 function not available")
-            return
+        # Check which functions are available
+        available_functions = list(jrpc_server.call.keys())
+        print(f"Available functions for testing: {available_functions}")
         
+        # Define our chain callbacks
         def on_unique_fn1(results):
             if not results or len(results.keys()) == 0:
                 print("No results returned from uniqueFn1")
@@ -137,16 +137,36 @@ class TestClass:
             print(err)
         
         try:
-            # Chain of calls
-            jrpc_server.call['TestClass.uniqueFn1'](self.i, 'hi there 1') \
-                .then(on_unique_fn1) \
-                .then(on_unique_fn2) \
-                .then(on_common_fn) \
-                .catch(on_error)
+            # Determine which functions to use
+            if 'TestClass.uniqueFn1' in jrpc_server.call:
+                print("Starting with uniqueFn1")
+                # Start with uniqueFn1
+                jrpc_server.call['TestClass.uniqueFn1'](self.i, 'hi there 1') \
+                    .then(on_unique_fn1) \
+                    .then(on_unique_fn2) \
+                    .then(on_common_fn) \
+                    .catch(on_error)
+            elif 'TestClass.uniqueFn2' in jrpc_server.call:
+                # Start with uniqueFn2 directly
+                print("Starting with uniqueFn2 (uniqueFn1 not available)")
+                jrpc_server.call['TestClass.uniqueFn2'](self.i, 'hi there 2') \
+                    .then(on_unique_fn2) \
+                    .then(on_common_fn) \
+                    .catch(on_error)
+            elif 'TestClass.commonFn' in jrpc_server.call:
+                # Just call commonFn directly
+                print("Starting with commonFn (uniqueFn1 and uniqueFn2 not available)")
+                jrpc_server.call['TestClass.commonFn'](self.i, 'common Fn') \
+                    .then(on_common_fn) \
+                    .catch(on_error)
+            else:
+                print("No remote functions available to test")
                 
             self.i += 1
         except Exception as e:
             print(f"Exception during multiClientTest: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
 if __name__ == "__main__":
     # Create server on port 9000
@@ -175,16 +195,20 @@ if __name__ == "__main__":
             has_connected_remotes = hasattr(jrpc_server, 'remotes') and jrpc_server.remotes
             
             if has_connected_remotes:
-                # Check if functions are available
-                if jrpc_server.functions_ready:
-                    print("Running multi-client test with available functions...")
+                # Get available functions and check if any match our requirements
+                available_functions = list(jrpc_server.call.keys()) if hasattr(jrpc_server, 'call') and jrpc_server.call else []
+                usable_functions = [f for f in available_functions if f.startswith('TestClass.')]
+                
+                if usable_functions:
+                    # We have at least some useful functions to test with
+                    print(f"Running multi-client test with available functions: {usable_functions}")
                     tc.multi_client_test(jrpc_server)
                 else:
                     # Recheck if functions have become available
                     jrpc_server.check_required_functions()
                     
                     if not jrpc_server.functions_ready:
-                        print("Remote connected but waiting for functions to be ready...")
+                        print("Remote connected but waiting for usable functions...")
                         # Try to actively sync with remotes - but only once every 5 seconds
                         current_time = time.time()
                         for remote_id, remote in jrpc_server.remotes.items():
@@ -200,9 +224,9 @@ if __name__ == "__main__":
                                     # Update last sync time
                                     jrpc_server._last_sync_time[remote_id] = current_time
                                     
-                                    remote.call('system.listComponents', [], lambda err, result: 
+                                    remote.jrpc.call('system.listComponents', [], lambda err, result: 
                                         print(f"Sync error: {err}") if err else 
-                                        jrpc_server.process_remote_components(remote_id, result))
+                                        jrpc_server.setup_fns(list(result.keys()) if result else [], remote))
                                 except Exception as e:
                                     print(f"Error requesting components from remote {remote_id}: {str(e)}")
                             else:

@@ -195,8 +195,11 @@ class JRPC2:
         """
         request_id = self.next_id
         self.next_id += 1
+        
+        # Store callback with timeout handling
         self.requests[request_id] = callback
         
+        # Create request
         request = {
             'jsonrpc': '2.0',
             'id': request_id,
@@ -205,6 +208,22 @@ class JRPC2:
         }
         
         print(f"Calling remote method {method} with id {request_id}")
+        
+        # Set up basic timeout handling
+        def timeout_handler():
+            if request_id in self.requests:
+                print(f"Request {request_id} for method {method} timed out")
+                callback({'code': -32603, 'message': f'Request timeout for {method}'}, None)
+                self.requests.pop(request_id, None)
+        
+        # Start timeout timer
+        if self.remote_timeout > 0:
+            import threading
+            timer = threading.Timer(self.remote_timeout, timeout_handler)
+            timer.daemon = True
+            timer.start()
+        
+        # Send the request
         self._transmit(json.dumps(request))
     
     def expose(self, methods: Dict[str, Callable]):

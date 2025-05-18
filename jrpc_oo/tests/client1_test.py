@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from jrpc_oo.JRPCClient import JRPCClient
 
 class TestClass:
-    def uniqueFn1(self, i, str_param):
+    def uniqueFn1(self, i, str_param=None):
         """Unique function for client 1"""
         print('unique1')
         print('args:', i, str_param)

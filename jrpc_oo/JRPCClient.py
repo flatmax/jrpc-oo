@@ -28,7 +28,7 @@ class JRPCClient(JRPCCommon):
         self.remote_timeout = remote_timeout
         self.ws = None
         self._connected = False
-        self._ws_wrapper = None
+        self.remote = None  # Single remote instead of remotes dictionary
         
         # Start connection if URI provided
         if server_uri:
@@ -37,27 +37,34 @@ class JRPCClient(JRPCCommon):
     def server_changed(self):
         """Handle changes to the server URI."""
         if self.ws:
-            self.ws.close()
-            self.ws = None
+            self.close()
             
         try:
-            # Create a WebSocket connection
+            # Create WebSocket connection
             self.ws = create_connection(self.server_uri)
             
-            # Create a wrapper around the WebSocket
-            class WSWrapper:
-                def __init__(self, ws):
-                    self.ws = ws
-                    self.on_message = None
-                    self.on_close = None
-                
-                def send(self, message):
+            # Create a remote instance
+            self.remote = self.new_remote()
+            
+            # Set up direct transmitter
+            def transmit(message, next_callback):
+                try:
                     self.ws.send(message)
+                    next_callback(False)
+                except Exception as e:
+                    print(f"Transmission error: {str(e)}")
+                    next_callback(True)
             
-            self._ws_wrapper = WSWrapper(self.ws)
+            self.remote.jrpc.set_transmitter(transmit)
             
-            # Set up the remote
-            self.create_remote(self._ws_wrapper)
+            # Expose classes to remote
+            if self.classes:
+                for cls in self.classes:
+                    self.remote.jrpc.expose(cls)
+                self.remote.jrpc.upgrade()
+            
+            # Notify that a remote is connected
+            self.remote_is_up()
             
             # Start receive thread
             self._connected = True
@@ -65,28 +72,46 @@ class JRPCClient(JRPCCommon):
             self._receive_thread.daemon = True
             self._receive_thread.start()
             
+            # Request remote functions
+            self.remote.jrpc.call('system.listComponents', [], self._on_components_listed)
+            
         except Exception as e:
             print(f"Connection error: {str(e)}")
             self.ws_error(e)
     
+    def _on_components_listed(self, err, result):
+        """Handle remote component listing."""
+        if err:
+            print(f"Error listing components: {err}")
+            return
+        
+        if result:
+            try:
+                method_names = list(result.keys())
+                print(f"Remote components available: {method_names}")
+                self.setup_fns(method_names, self.remote)
+            except Exception as e:
+                print(f"Error processing component listing: {str(e)}")
+    
     def _receive_loop(self):
         """Run a loop to receive messages from the WebSocket."""
-        try:
-            while self._connected and self.ws:
-                try:
-                    message = self.ws.recv()
-                    if message:
-                        print(f"Client received raw message: {message[:100]}{'...' if len(message) > 100 else ''}")
-                        if self._ws_wrapper and self._ws_wrapper.on_message:
-                            self._ws_wrapper.on_message(message)
-                except Exception as e:
-                    print(f"WebSocket receive error: {str(e)}")
-                    self._connected = False
-                    if self._ws_wrapper and self._ws_wrapper.on_close:
-                        self._ws_wrapper.on_close()
-                    break
-        except Exception as e:
-            print(f"Receive loop error: {str(e)}")
+        while self._connected and self.ws:
+            try:
+                # Use a timeout to prevent blocking forever
+                self.ws.settimeout(1.0)  # 1 second timeout
+                message = self.ws.recv()
+                if message:
+                    print(f"Client received message: {message[:100]}{'...' if len(message) > 100 else ''}")
+                    self.remote.jrpc.receive(message)
+            except Exception as e:
+                # If it's a timeout, just continue
+                import socket
+                if isinstance(e, socket.timeout):
+                    continue
+                    
+                print(f"WebSocket receive error: {str(e)}")
+                self._disconnect()
+                break
     
     def ws_error(self, event):
         """
@@ -116,12 +141,18 @@ class JRPCClient(JRPCCommon):
         Returns:
             True if connected, False otherwise
         """
-        return self._connected and hasattr(self, 'server') and bool(self.server)
+        return self._connected and self.remote is not None
     
     def remote_is_up(self):
         """Called when the remote server is up."""
         print("JRPCClient::remote_is_up")
         super().remote_is_up()
+    
+    def _disconnect(self):
+        """Handle disconnection internally."""
+        self._connected = False
+        if self.remote:
+            self.remote_disconnected(self.remote.uuid)
     
     def remote_disconnected(self, uuid):
         """
@@ -134,18 +165,25 @@ class JRPCClient(JRPCCommon):
         self._connected = False
     
     def close(self):
-        """Close the WebSocket connection."""
+        """Close the WebSocket connection and clean up."""
         self._connected = False
         
-        # Wait for receive thread to terminate if it exists
+        # Clean up receive thread
         if hasattr(self, '_receive_thread') and self._receive_thread.is_alive():
             try:
-                self._receive_thread.join(1.0)  # Give thread 1 second to terminate
-            except Exception as e:
-                print(f"Error joining receive thread: {str(e)}")
+                self._receive_thread.join(1.0)
+            except Exception:
+                pass  # Thread may already be dead
         
+        # Close WebSocket
         if self.ws:
             try:
                 self.ws.close()
+                self.ws = None
             except Exception as e:
                 print(f"Error closing WebSocket: {str(e)}")
+        
+        # Clean up remote
+        if self.remote:
+            self.rm_remote(None, self.remote.uuid)
+            self.remote = None
