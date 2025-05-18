@@ -18,8 +18,8 @@ classifiers = [
 requires-python = ">=3.8"
 dependencies = [
     "jsonrpclib-pelix",
-    "websocket-client",
-    "websocket-server",
+    "websockets",
+    "asyncio",
 ]
 
 [project.optional-dependencies]
