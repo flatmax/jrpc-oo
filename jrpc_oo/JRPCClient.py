@@ -29,6 +29,8 @@ class JRPCClient(JRPCCommon):
         self.ws = None
         self._connected = False
         self._ws_wrapper = None
+        self._setup_done_in_progress = False
+        self._last_sync_time = {}
         
         # Start connection if URI provided
         if server_uri:
@@ -109,31 +111,72 @@ class JRPCClient(JRPCCommon):
     
     def setup_done(self):
         """Called when the remote setup is complete."""
-        print("JRPCClient: Remote functions setup complete")
-        
-        # Now make sure our classes are properly exposed to all remotes
-        if hasattr(self, 'remotes') and self.remotes and hasattr(self, 'classes') and self.classes:
-            for remote_id, remote in self.remotes.items():
-                # Re-expose all classes to this remote
-                for cls in self.classes:
-                    remote.expose(cls)
+        # Prevent recursive calls to setup_done
+        if hasattr(self, '_setup_done_in_progress') and self._setup_done_in_progress:
+            print("Setup already in progress, skipping recursive call")
+            return
+            
+        try:
+            self._setup_done_in_progress = True
+            print("JRPCClient: Remote functions setup complete")
+            
+            # Now make sure our classes are properly exposed to all remotes
+            if hasattr(self, 'remotes') and self.remotes and hasattr(self, 'classes') and self.classes:
+                current_time = time.time()
                 
-                # Force an upgrade to update the remote's method list
-                remote.upgrade()
-                
-                # Call system.listComponents again to ensure both sides are in sync
-                print(f"Re-requesting components from remote {remote_id}")
-                remote.call('system.listComponents', [], lambda err, result: 
-                    print(f"Re-sync error: {err}") if err else 
-                    self.process_remote_components(remote_id, result))
-        
-        super().setup_done()
+                for remote_id, remote in self.remotes.items():
+                    # Skip if we've synced with this remote recently
+                    if hasattr(self, '_last_sync_time') and remote_id in self._last_sync_time:
+                        last_sync = self._last_sync_time[remote_id]
+                        if current_time - last_sync < 5:  # Don't re-sync more than once every 5 seconds
+                            print(f"Skipping re-sync for {remote_id} - too soon since last sync")
+                            continue
+                    
+                    # Re-expose all classes to this remote
+                    for cls in self.classes:
+                        remote.expose(cls)
+                    
+                    # Force an upgrade to update the remote's method list
+                    remote.upgrade()
+                    
+                    # Track sync time
+                    self._last_sync_time[remote_id] = current_time
+                    
+                    # Call system.listComponents again to ensure both sides are in sync
+                    print(f"Re-requesting components from remote {remote_id}")
+                    remote.call('system.listComponents', [], lambda err, result: 
+                        print(f"Re-sync error: {err}") if err else 
+                        self.process_remote_components(remote_id, result))
+            
+            super().setup_done()
+        finally:
+            self._setup_done_in_progress = False
     
     def process_remote_components(self, remote_id, result):
         """Process available components from remote"""
         if result:
             component_list = list(result.keys())
             print(f"Re-sync successful, remote {remote_id} components: {component_list}")
+            
+            # Check if we already have all these functions registered
+            already_registered = True
+            if hasattr(self, 'call'):
+                for fn in component_list:
+                    if fn not in self.call:
+                        already_registered = False
+                        break
+            else:
+                already_registered = False
+                
+            if already_registered:
+                print(f"All functions already registered for remote {remote_id}, skipping setup_fns")
+                return
+                
+            # Find the remote with this ID
+            if hasattr(self, 'remotes') and remote_id in self.remotes:
+                remote = self.remotes[remote_id]
+                # Set up the functions from the result
+                self.setup_fns(component_list, remote)
     
     def is_connected(self):
         """

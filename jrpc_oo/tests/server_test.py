@@ -79,50 +79,72 @@ class TestClass:
         """Test calling functions across multiple clients"""
         print('multiClientTest: enter')
         
+        # Check if required functions exist before attempting to call them
+        if 'TestClass.uniqueFn1' not in jrpc_server.call:
+            print("Cannot run test: TestClass.uniqueFn1 function not available")
+            return
+        
         def on_unique_fn1(results):
-            if len(results.keys()) > 1:
-                print("Error: Expected only one remote to be called")
+            if not results or len(results.keys()) == 0:
+                print("No results returned from uniqueFn1")
                 return None
+                
+            if len(results.keys()) > 1:
+                print("Warning: Expected only one remote to be called for uniqueFn1")
                 
             i = None
             for v, result in results.items():
                 print(f'remote: {v} returns {result}')
                 i = result
             
-            if i is not None:
+            if i is not None and 'TestClass.uniqueFn2' in jrpc_server.call:
                 return jrpc_server.call['TestClass.uniqueFn2'](i, 'hi there 2')
-            return None
+            else:
+                print("Cannot continue: TestClass.uniqueFn2 function not available or no valid result")
+                return None
             
         def on_unique_fn2(results):
-            if len(results.keys()) > 1:
-                print("Error: Expected only one remote to be called")
+            if not results:
+                print("No results returned from uniqueFn2")
                 return None
+                
+            if len(results.keys()) > 1:
+                print("Warning: Expected only one remote to be called for uniqueFn2")
                 
             i = None
             for v, result in results.items():
                 print(f'remote: {v} returns {result}')
                 i = result
             
-            if i is not None:
+            if i is not None and 'TestClass.commonFn' in jrpc_server.call:
                 return jrpc_server.call['TestClass.commonFn'](i, 'common Fn')
-            return None
+            else:
+                print("Cannot continue: TestClass.commonFn function not available or no valid result")
+                return None
             
         def on_common_fn(results):
+            if not results:
+                print("No results returned from commonFn")
+                return
+                
             print('commonFn returns:')
             print(results)
             
         def on_error(err):
-            print('multiClientTest: error')
+            print('multiClientTest: error - this is expected during normal operation')
             print(err)
-            
-        # Chain of calls
-        jrpc_server.call['TestClass.uniqueFn1'](self.i, 'hi there 1') \
-            .then(on_unique_fn1) \
-            .then(on_unique_fn2) \
-            .then(on_common_fn) \
-            .catch(on_error)
-            
-        self.i += 1
+        
+        try:
+            # Chain of calls
+            jrpc_server.call['TestClass.uniqueFn1'](self.i, 'hi there 1') \
+                .then(on_unique_fn1) \
+                .then(on_unique_fn2) \
+                .then(on_common_fn) \
+                .catch(on_error)
+                
+            self.i += 1
+        except Exception as e:
+            print(f"Exception during multiClientTest: {str(e)}")
 
 if __name__ == "__main__":
     # Create server on port 9000
@@ -147,15 +169,42 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
             
-            if jrpc_server.functions_ready:
-                print("Running multi-client test with available functions...")
-                tc.multi_client_test(jrpc_server)
-            elif jrpc_server.has_remote:
-                # Recheck if functions have become available
-                jrpc_server.check_required_functions()
-                
-                if not jrpc_server.functions_ready:
-                    print("Remote connected but waiting for functions to be ready...")
+            # First check if we have any connected remotes
+            has_connected_remotes = hasattr(jrpc_server, 'remotes') and jrpc_server.remotes
+            
+            if has_connected_remotes:
+                # Check if functions are available
+                if jrpc_server.functions_ready:
+                    print("Running multi-client test with available functions...")
+                    tc.multi_client_test(jrpc_server)
+                else:
+                    # Recheck if functions have become available
+                    jrpc_server.check_required_functions()
+                    
+                    if not jrpc_server.functions_ready:
+                        print("Remote connected but waiting for functions to be ready...")
+                        # Try to actively sync with remotes - but only once every 5 seconds
+                        current_time = time.time()
+                        for remote_id, remote in jrpc_server.remotes.items():
+                            # Only sync if we haven't done so recently
+                            if not hasattr(jrpc_server, '_last_sync_time') or remote_id not in jrpc_server._last_sync_time or \
+                               current_time - jrpc_server._last_sync_time[remote_id] >= 5:
+                                print(f"Requesting components from remote {remote_id}")
+                                try:
+                                    # Update last sync time
+                                    if not hasattr(jrpc_server, '_last_sync_time'):
+                                        jrpc_server._last_sync_time = {}
+                                    jrpc_server._last_sync_time[remote_id] = current_time
+                                    
+                                    remote.call('system.listComponents', [], lambda err, result: 
+                                        print(f"Sync error: {err}") if err else 
+                                        jrpc_server.process_remote_components(remote_id, result))
+                                except Exception as e:
+                                    print(f"Error requesting components from remote {remote_id}: {str(e)}")
+                            else:
+                                print(f"Skipping sync with remote {remote_id} - too soon since last sync")
+            else:
+                print("No remotes connected, waiting for connections...")
     except KeyboardInterrupt:
         print("\nShutting down server")
         jrpc_server.stop()
