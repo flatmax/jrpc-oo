@@ -32,11 +32,10 @@ class Promise:
             try:
                 result = callback(value)
                 if hasattr(result, 'then'):
-                    # Chain promise resolutions
-                    result.then(
-                        lambda val: self._resolve(val),
-                        lambda err: self._reject(err)
-                    )
+                    # Chain promise resolutions - pass callbacks separately
+                    result.then(lambda val: self._resolve(val))
+                    # Register error handler using catch() instead
+                    result.catch(lambda err: self._reject(err))
                 # If no then method but still a result, continue with that result
                 elif result is not None:
                     self._resolve(result)
@@ -211,6 +210,8 @@ class JRPCCommon:
         # Initialize remote RPCs container if needed
         if not hasattr(remote, 'rpcs') or remote.rpcs is None:
             remote.rpcs = {}
+            
+        print(f"Setting up functions for remote {remote.uuid}: {fn_names}")
         
         # Create RPC functions for each method name
         for fn_name in fn_names:

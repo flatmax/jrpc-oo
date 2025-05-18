@@ -31,6 +31,9 @@ if __name__ == "__main__":
     tc = TestClass()
     jrpc_client.add_class(tc)
     
+    # Give time for the connection to establish
+    time.sleep(1)
+    
     # Keep the client running
     try:
         print("Client 2 running. Press Ctrl+C to exit.")

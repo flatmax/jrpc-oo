@@ -141,7 +141,7 @@ class JRPC2:
             elif 'error' in data:
                 print(f"Calling callback with error for id {response_id}: {data['error']}")
                 callback(data['error'], None)
-        else:
+        elif response_id is not None:
             print(f"No callback registered for response id {response_id}")
     
     def _send_result(self, request_id: Union[str, int], result: Any):
@@ -225,7 +225,7 @@ class JRPC2:
             result = {name: {} for name in self.methods.keys()}
             print(f"Returning methods: {list(result.keys())}")
             next_callback(None, result)
-            
+    
         # Add system.listComponents method which is required for the JRPC-OO protocol
         self.methods['system.listComponents'] = system_list_components
         print(f"JRPC2: Exposed methods after upgrade: {list(self.methods.keys())}")

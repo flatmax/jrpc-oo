@@ -17,7 +17,30 @@ class JRPCServer(JRPCCommon):
     def setup_done(self):
         """Called when the remote setup is complete."""
         print("JRPCServer: Remote functions setup complete")
+        
+        # Now make sure our classes are properly exposed to all remotes
+        if hasattr(self, 'remotes') and self.remotes and hasattr(self, 'classes') and self.classes:
+            for remote_id, remote in self.remotes.items():
+                # Re-expose all classes to this remote
+                for cls in self.classes:
+                    remote.expose(cls)
+                
+                # Force an upgrade to update the remote's method list
+                remote.upgrade()
+                
+                # Call system.listComponents again to ensure both sides are in sync
+                print(f"Re-requesting components from remote {remote_id}")
+                remote.call('system.listComponents', [], lambda err, result: 
+                    print(f"Re-sync error: {err}") if err else 
+                    self.process_remote_components(remote_id, result))
+        
         super().setup_done()
+    
+    def process_remote_components(self, remote_id, result):
+        """Process available components from remote"""
+        if result:
+            component_list = list(result.keys())
+            print(f"Re-sync successful, remote {remote_id} components: {component_list}")
     
     def __init__(self, port: int = 9000, remote_timeout: int = 60):
         """

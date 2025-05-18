@@ -25,29 +25,43 @@ class JRPCTestServer(JRPCServer):
         super().remote_is_up()
         self.has_remote = True
         print("First client connected!")
+        # Check if we already have required functions
+        self.check_required_functions()
+    
+    def check_required_functions(self):
+        """Check if required functions are available"""
+        # Get all available functions
+        available = list(self.call.keys()) if hasattr(self, 'call') and self.call else []
+        
+        # Check if any of the required functions are available
+        available_funcs = 0
+        for func in self.required_functions:
+            if func in available:
+                available_funcs += 1
+                print(f"Required function found: {func}")
+            
+        if available_funcs > 0:
+            # We have at least some functions available
+            print(f"Found {available_funcs}/{len(self.required_functions)} required functions, ready to start testing")
+            self.functions_ready = True
+            
+            # Print which functions are still missing
+            missing = [f for f in self.required_functions if f not in available]
+            if missing:
+                print(f"Still waiting for optional functions: {missing}")
+            else:
+                print("All required remote functions are available!")
+        else:
+            # No required functions available yet
+            print(f"Waiting for functions: {self.required_functions}")
+            self.functions_ready = False
     
     def setup_done(self):
         """Called when remote functions are set up"""
         super().setup_done()
         
-        # Check if any of the required functions are available
-        # We'll test with whatever function is available first
-        available_funcs = 0
-        for func in self.required_functions:
-            if func in self.call:
-                available_funcs += 1
-                
-        if available_funcs > 0:
-            # We have at least some functions available
-            print(f"Found {available_funcs} required functions, ready to start testing")
-            self.functions_ready = True
-        
-        if all_ready:
-            print("All required remote functions are available!")
-            self.functions_ready = True
-        else:
-            available = list(self.call.keys())
-            print(f"Waiting for functions: {[f for f in self.required_functions if f not in available]}")
+        # Check if required functions are available
+        self.check_required_functions()
 
 
 class TestClass:
@@ -126,12 +140,22 @@ if __name__ == "__main__":
     
     # Run the multi-client test periodically, but only when required functions are ready
     try:
+        # Try to run this immediately after all other initialization, 
+        # in case functions are already registered
+        jrpc_server.check_required_functions()
+        
         while True:
             time.sleep(1)
+            
             if jrpc_server.functions_ready:
+                print("Running multi-client test with available functions...")
                 tc.multi_client_test(jrpc_server)
             elif jrpc_server.has_remote:
-                print("Remote connected but waiting for functions to be ready...")
+                # Recheck if functions have become available
+                jrpc_server.check_required_functions()
+                
+                if not jrpc_server.functions_ready:
+                    print("Remote connected but waiting for functions to be ready...")
     except KeyboardInterrupt:
         print("\nShutting down server")
         jrpc_server.stop()
