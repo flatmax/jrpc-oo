@@ -66,15 +66,20 @@ class ExposeClass:
             def wrapper(params, next_cb, method_name=method_name):
                 """Wrapper function for the method call."""
                 try:
-                    if isinstance(params.get('args', []), list):
-                        args = params.get('args', [])
-                        method = getattr(cls_instance, method_name)
-                        result = method(*args)
-                        return next_cb(None, result)
+                    method = getattr(cls_instance, method_name)
+                    
+                    # Handle args format used by JS implementation
+                    if isinstance(params, dict) and 'args' in params:
+                        args = params['args']
+                        if isinstance(args, list):
+                            result = method(*args)
+                        else:
+                            result = method(args)
                     else:
-                        method = getattr(cls_instance, method_name)
+                        # For direct calls without args wrapping
                         result = method(params)
-                        return next_cb(None, result)
+                        
+                    return next_cb(None, result)
                 except Exception as e:
                     print(f"Failed: {e}")
                     return next_cb(str(e), None)

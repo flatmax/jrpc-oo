@@ -29,18 +29,25 @@ class JRPCServer(JRPCCommon):
         self.server = await websockets.serve(self.handle_connection, "0.0.0.0", self.port)
         print(f"JRPC Server started on port {self.port}")
         
-    async def handle_connection(self, websocket, path):
+    async def handle_connection(self, websocket):
         """Handle a new WebSocket connection.
         
         Args:
             websocket: The WebSocket connection
-            path: The connection path
         """
+        # Create the remote with proper async handling
         remote = self.create_remote(websocket)
         
+        # Define message handler function
+        async def on_message_handler(message):
+            if isinstance(message, bytes):
+                message = message.decode('utf-8')
+            remote.receive(message)
+        
         try:
+            # Wait for messages from the client
             async for message in websocket:
-                await remote.on_message(message)
+                await on_message_handler(message)
         except websockets.exceptions.ConnectionClosed:
             pass
         finally:

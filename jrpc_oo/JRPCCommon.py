@@ -27,6 +27,11 @@ class JRPCCommon:
         self.classes = []  # List of exposed class objects
         self.call = {}     # Function to call all remotes with the same method
         self.server = {}   # Legacy: Functions mapped to a particular remote
+        
+        # Make sure we don't conflict with attributes
+        if hasattr(self, 'server') and not isinstance(self.server, dict):
+            self._original_server = self.server  # Preserve any existing server attribute
+            self.server = {}
         self.remote_timeout = 60
         
     def new_remote(self) -> JRPC2:
@@ -57,11 +62,6 @@ class JRPCCommon:
         if hasattr(self, 'ws'):  # Browser version
             ws = self.ws
             
-            async def on_message(message):
-                if isinstance(message, bytes):
-                    message = message.decode('utf-8')
-                remote.receive(message)
-                
             async def transmit(msg, next_cb):
                 try:
                     await ws.send(msg)
@@ -70,16 +70,11 @@ class JRPCCommon:
                     print(f"Error transmitting: {e}")
                     next_cb(True)
             
-            ws.on_message = on_message
+            # Keep a reference to the WebSocket for handling messages in handle_connection
             ws.on_close = lambda ev: self.rm_remote(ev, remote.uuid)
             remote.set_transmitter(transmit)
             
         else:  # Server version
-            async def on_message(message):
-                if isinstance(message, bytes):
-                    message = message.decode('utf-8')
-                remote.receive(message)
-                
             async def transmit(msg, next_cb):
                 try:
                     await ws.send(msg)
@@ -88,7 +83,7 @@ class JRPCCommon:
                     print(f"Error transmitting: {e}")
                     next_cb(True)
             
-            ws.on_message = on_message
+            # Let the handler in handle_connection manage messages
             ws.on_close = lambda: self.rm_remote(None, remote.uuid)
             remote.set_transmitter(transmit)
             
@@ -107,7 +102,7 @@ class JRPCCommon:
             uuid: UUID of the remote to remove
         """
         # Remove methods from server object
-        if hasattr(self, 'server') and self.server:
+        if hasattr(self, 'server') and isinstance(self.server, dict):
             if uuid in self.remotes and hasattr(self.remotes[uuid], 'rpcs'):
                 for fn in self.remotes[uuid].rpcs:
                     if fn in self.server:
@@ -156,8 +151,19 @@ class JRPCCommon:
         remote.upgrade()
         
         # List available components
+        # Using create_task to handle async properly
         remote.call('system.listComponents', [], lambda err, result: 
-            self.handle_list_components(err, result, remote))
+            asyncio.create_task(self._handle_list_components_async(err, result, remote)))
+    
+    async def _handle_list_components_async(self, err, result, remote):
+        """Async wrapper for handle_list_components.
+        
+        Args:
+            err: Error object if any
+            result: Result of the call
+            remote: The remote that was called
+        """
+        self.handle_list_components(err, result, remote)
     
     def handle_list_components(self, err, result, remote):
         """Handle the response from system.listComponents.
@@ -170,8 +176,11 @@ class JRPCCommon:
         if err:
             print(f"Error listing components: {err}")
             return
-        
-        self.setup_fns(list(result.keys()), remote)
+            
+        # Result should now be a list of function names directly
+        fn_names = result if isinstance(result, list) else []
+            
+        self.setup_fns(fn_names, remote)
     
     def setup_fns(self, fn_names, remote):
         """Set up functions for calling on the server.
@@ -186,7 +195,7 @@ class JRPCCommon:
         
         for fn_name in fn_names:
             # Create function in remote.rpcs
-            async def remote_call(params, fn_name=fn_name):
+            async def remote_call(*args, fn_name=fn_name):
                 """Call a remote function and return a Promise."""
                 future = asyncio.get_event_loop().create_future()
                 
@@ -199,7 +208,7 @@ class JRPCCommon:
                         if not future.done():
                             future.set_result(result)
                 
-                remote.call(fn_name, {'args': params}, callback)
+                remote.call(fn_name, {'args': list(args)}, callback)
                 return await future
             
             remote.rpcs[fn_name] = remote_call
@@ -231,9 +240,11 @@ class JRPCCommon:
                 self.call[fn_name] = call_all_remotes
             
             # For backwards compatibility - setup server functions
-            if not hasattr(self, 'server'):
+            # Ensure server is a dictionary
+            if not hasattr(self, 'server') or not isinstance(self.server, dict):
                 self.server = {}
                 
+            # Now it's safe to check if fn_name is in self.server
             if fn_name not in self.server:
                 self.server[fn_name] = remote.rpcs[fn_name]
             else:

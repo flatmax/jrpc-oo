@@ -31,14 +31,19 @@ class JRPCClient(JRPCCommon):
             self.connected = True
             print(f"Connected to {self.server_uri}")
             
-            # Create remote
+            # Create remote with proper async handling
             remote = self.create_remote(self.ws)
+            
+            # Define message handler
+            async def on_message_handler(message):
+                if isinstance(message, bytes):
+                    message = message.decode('utf-8')
+                remote.receive(message)
             
             # Handle incoming messages
             try:
                 async for message in self.ws:
-                    if hasattr(self.ws, 'on_message'):
-                        await self.ws.on_message(message)
+                    await on_message_handler(message)
             except websockets.exceptions.ConnectionClosed:
                 self.connected = False
                 print(f"Disconnected from {self.server_uri}")

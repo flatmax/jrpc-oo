@@ -36,7 +36,12 @@ class JRPC2:
     
     def upgrade(self):
         """Initialize capabilities after setup."""
-        pass
+        # Add system.listComponents method
+        self.methods["system.listComponents"] = lambda params, next_cb: next_cb(None, list(self.methods.keys()))
+        
+        # Define empty methods dictionary if none exists
+        if not hasattr(self, 'rpcs'):
+            self.rpcs = {}
     
     def call(self, method: str, params: Any, callback: Callable):
         """Make a remote procedure call.
@@ -62,7 +67,24 @@ class JRPC2:
                     del self.requests[request_id]
                 callback(Exception(f"Failed to send request: {error}"), None)
         
-        self.transmitter(json.dumps(request), next_cb)
+        asyncio.create_task(self._transmit_message(json.dumps(request), next_cb))
+    
+    async def _transmit_message(self, message, next_cb):
+        """Handle message transmission with proper awaiting for async transmitters.
+        
+        Args:
+            message: The JSON message to send
+            next_cb: Callback after transmission
+        """
+        try:
+            if callable(self.transmitter):
+                if asyncio.iscoroutinefunction(self.transmitter):
+                    await self.transmitter(message, next_cb)
+                else:
+                    self.transmitter(message, next_cb)
+        except Exception as e:
+            print(f"Error in _transmit_message: {e}")
+            next_cb(True)
     
     def receive(self, message_str: str):
         """Process a received message.
@@ -93,12 +115,12 @@ class JRPC2:
                 
                 if method in self.methods:
                     try:
-                        if isinstance(params, dict):
-                            result = self.methods[method](params, lambda err, res: self._send_response(request_id, err, res))
-                        elif isinstance(params, list):
-                            result = self.methods[method](*params, lambda err, res: self._send_response(request_id, err, res))
-                        else:
-                            result = self.methods[method](params, lambda err, res: self._send_response(request_id, err, res))
+                        # Create callback for sending response
+                        def response_callback(err, res):
+                            self._send_response(request_id, err, res)
+                            
+                        # Call method with parameters and callback
+                        self.methods[method](params, response_callback)
                     except Exception as e:
                         self._send_error(request_id, str(e))
                 else:
@@ -136,8 +158,16 @@ class JRPC2:
         def next_cb(err):
             if err:
                 print(f"Failed to send response: {err}")
+        
+        try:
+            json_response = json.dumps(response)
+        except TypeError as e:
+            # Handle non-serializable objects
+            print(f"JSON serialization error: {e}")
+            self._send_error(request_id, "Internal error: Result not serializable")
+            return
                 
-        self.transmitter(json.dumps(response), next_cb)
+        asyncio.create_task(self._transmit_message(json_response, next_cb))
     
     def _send_error(self, request_id, message, code=-32000):
         """Send an error response.
@@ -160,4 +190,4 @@ class JRPC2:
             if err:
                 print(f"Failed to send error response: {err}")
                 
-        self.transmitter(json.dumps(response), next_cb)
+        asyncio.create_task(self._transmit_message(json.dumps(response), next_cb))
