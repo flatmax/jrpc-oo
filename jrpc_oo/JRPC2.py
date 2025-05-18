@@ -37,7 +37,14 @@ class JRPC2:
     def upgrade(self):
         """Initialize capabilities after setup."""
         # Add system.listComponents method - expose method names for discovery
-        self.methods["system.listComponents"] = lambda params, next_cb: next_cb(None, list(self.methods.keys()))
+        def list_components(params, next_cb):
+            # Print the methods keys for debugging
+            methods_list = list(self.methods.keys())
+            # Return as a dictionary with method names as keys for compatibility with JS Object.keys()
+            methods_dict = {method: True for method in methods_list}
+            return next_cb(None, methods_dict)
+            
+        self.methods["system.listComponents"] = list_components
         
         # Define empty methods dictionary if none exists
         if not hasattr(self, 'rpcs'):

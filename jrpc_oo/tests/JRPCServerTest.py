@@ -79,7 +79,13 @@ async def main():
     tc2 = TestClass2()
     
     # Add class to server
-    jrpc_server.add_class(tc2)
+    jrpc_server.add_class(tc2, "TestClass")  # Explicitly set the class name
+    
+    # Debug what methods are exposed
+    if hasattr(jrpc_server, 'methods'):
+        print("Exposed methods:")
+        for method_name in jrpc_server.methods:
+            print(f"  - {method_name}")
     
     # Start server
     await jrpc_server.start()
