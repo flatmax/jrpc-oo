@@ -7,3 +7,5 @@ package-lock.json
 *.pyc
 *.egg-info/
 **/__pycache__/
+*.tgz
+**/build
