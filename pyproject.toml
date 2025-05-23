@@ -1,16 +1,36 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "jrpc_oo"
 version = "0.1.0"
 description = "JSON-RPC OO - Object-oriented JSON-RPC over WebSockets"
-requires-python = ">=3.7"
+readme = "README.md"
+authors = [
+    {name = "Flatmax", email = "example@example.com"}
+]
+license = "BSD-3-Clause"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.8"
 dependencies = [
+    "jsonrpclib-pelix",
     "websockets",
     "asyncio",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "flake8",
+    "black",
+]
+
 [tool.setuptools]
 packages = ["jrpc_oo"]
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
