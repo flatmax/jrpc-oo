@@ -43,6 +43,7 @@ class DoubleCallTestClass:
         res = self._double_call_test(first_param, second_param)
         print("_double_call_test returns : ")
         print(res)
+        return res
     
     def _double_call_test(self, first_param, second_param):
         print(f"double_call_test called with: {first_param}, {second_param}")
@@ -50,13 +51,13 @@ class DoubleCallTestClass:
         # Generate a unique request ID for this call
         request_id = f"request_{asyncio.get_event_loop().time()}"
         
-        # Create initial response
+        # Create initial response with the same structure as _process_callback returns
         response = {
-            "immediate_response": "Server received your call",
+            "request_id": request_id,
             "first_param": first_param,
             "second_param": second_param,
             "callback_status": "pending",
-            "request_id": request_id
+            "callback_result": None  # Will be populated when callback completes
         }
         
         # Store the future in a class attribute so we can track it
