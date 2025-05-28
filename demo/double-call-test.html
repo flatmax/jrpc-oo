@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JRPC Double Call Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .description {
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .instructions {
+            background-color: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .instructions li {
+            margin: 5px 0;
+        }
+        
+        double-call-client {
+            display: block;
+            width: 100%;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JRPC Double Call Test</h1>
+        
+        <div class="description">
+            <h3>About This Test</h3>
+            <p>This test demonstrates bidirectional communication between a web client and Python JRPC server. 
+            The client can call server methods, and the server can call back to client methods, creating a 
+            "double call" pattern useful for real-time applications.</p>
+        </div>
+        
+        <div class="instructions">
+            <h3>Instructions</h3>
+            <ol>
+                <li>Make sure the Python server is running: <code>python3 jrpc_oo/tests/JRPCServerTestDoubleCall.py</code></li>
+                <li>The server runs on port 9001 by default</li>
+                <li>If using HTTPS/WSS, ensure browser security clearance for the WebSocket connection</li>
+                <li>Use the buttons below to test different functionalities:</li>
+                <ul>
+                    <li><strong>Test Button Press:</strong> Simple server method call</li>
+                    <li><strong>Test Double Call:</strong> Server method that calls back to client</li>
+                    <li><strong>Get Server Status:</strong> Retrieve current server state</li>
+                    <li><strong>Reset Counter:</strong> Reset the server's call counter</li>
+                </ul>
+            </ol>
+        </div>
+        
+        <double-call-client></double-call-client>
+        
+        <div class="footer">
+            <p>JRPC-OO Double Call Test | Check browser console for additional debug information</p>
+        </div>
+    </div>
+
+    <script type="module" src="double-call-client.js"></script>
+    <script>
+      var je = document.querySelector('double-call-client');
+      je.serverURI="ws://0.0.0.0:9001";
+    </script>
+</body>
+</html>
