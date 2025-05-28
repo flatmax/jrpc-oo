@@ -37,74 +37,70 @@ class DoubleCallTestClass:
         
         return response
     
-    def double_call_test(self, first_param, second_param):
+    def double_call_test(self, msg):
         """Method that demonstrates calling back to the client."""
-        print("calling _double_call_Test")
-        res = self._double_call_test(first_param, second_param)
-        print("_double_call_test returns : ")
-        print(res)
-        return res
-    
-    def _double_call_test(self, first_param, second_param):
-        print(f"double_call_test called with: {first_param}, {second_param}")
+        print(f"double_call_test called with: {msg}")
         
         # Generate a unique request ID for this call
         request_id = f"request_{asyncio.get_event_loop().time()}"
         
-        # Create initial response with the same structure as _process_callback returns
-        response = {
-            "request_id": request_id,
-            "first_param": first_param,
-            "second_param": second_param,
-            "callback_status": "pending",
-            "callback_result": None  # Will be populated when callback completes
-        }
+        # Create a future that will be resolved when the callback completes
+        future = asyncio.get_event_loop().create_future()
         
-        # Store the future in a class attribute so we can track it
+        # Initialize results tracking
         if not hasattr(self, 'callback_results'):
             self.callback_results = {}
-        
-        # Create a future that will store the final result
-        future = asyncio.get_event_loop().create_future()
         self.callback_results[request_id] = future
         
-        # Start the async callback task in the background
+        # Create initial response object
+        response = {
+            "request_id": request_id,
+            "msg": msg,
+            "callback_status": "initiated"
+        }
+        
+        # Launch async task to handle the callback
         asyncio.create_task(
-            self._process_callback(request_id, future, first_param, second_param)
+            self._handle_callback(request_id, future, msg)
         )
         
         return response
-    
-    async def _process_callback(self, request_id, future, original_first, original_second):
-        """Process the callback and store the result in the future."""
+        
+    async def _handle_callback(self, request_id, future, msg):
+        """Background task that handles the callback and updates the future."""
         try:
-            # Call the client and get the result
-            result = await self.call_back_to_client(original_first, original_second)
+            # Call the client and wait for the result
+            result = await self.call_back_to_client(msg)
             
-            # Create a complete response with the callback result
+            # Create the complete response with the callback result
             complete_response = {
                 "request_id": request_id,
-                "first_param": original_first,
-                "second_param": original_second,
+                "msg": msg,
                 "callback_status": "completed",
                 "callback_result": result
             }
             
             # Set the future's result
-            future.set_result(complete_response)
+            if not future.done():
+                future.set_result(complete_response)
+                
+            print("Callback completed with result:")
+            print(complete_response)
             
-            return complete_response
         except Exception as e:
-            # If there's an error, store it in the future
+            # Handle any errors
             error_response = {
                 "request_id": request_id,
                 "callback_status": "error",
                 "error": str(e)
             }
-            future.set_result(error_response)
-            return error_response
+            if not future.done():
+                future.set_result(error_response)
+            
+            print(f"Callback error: {e}")
+    
         
-    async def call_back_to_client(self, original_first, original_second):
+    async def call_back_to_client(self, msg):
         """Call back to the client after a delay."""
         await asyncio.sleep(2)  # Wait 2 seconds
         
@@ -114,9 +110,7 @@ class DoubleCallTestClass:
                 server_methods = self.get_server()
                 if 'DoubleCallClient.client_callback' in server_methods:
                     result = await server_methods['DoubleCallClient.client_callback'](
-                        f"Server calling back with: {original_first}",
-                        f"And also: {original_second}",
-                        "This is the delayed callback!"
+                        msg
                     )
                     print("Client callback returned:")
                     print(json.dumps(result, indent=2))
@@ -152,7 +146,7 @@ class DoubleCallTestClass:
             "new_count": self.call_count
         }
         
-    async def get_callback_result(self, request_id):
+    def get_callback_result(self, request_id):
         """Get the result of a callback by its request ID.
         
         Args:
