@@ -162,20 +162,34 @@ export class DoubleCallClient extends JRPCClient {
     this.logOutput('>>> Testing double call...');
     
     if (this.server['DoubleCallTestClass.double_call_test'] != null) {
-      const firstParam = `First parameter ${Date.now()}`;
-      const secondParam = { 
-        type: 'test_data', 
-        timestamp: new Date().toISOString(),
-        random: Math.random()
-      };
+      const msg = `browser sent this out`;
       
-      this.logOutput(`Sending: ${firstParam}, ${JSON.stringify(secondParam)}`);
+      this.logOutput(`Sending: ${msg}`);
       
-      this.server['DoubleCallTestClass.double_call_test'](firstParam, secondParam)
+      this.server['DoubleCallTestClass.double_call_test'](msg)
       .then((result) => {
         this.logOutput('<<< Double call immediate response:');
         this.logOutput(JSON.stringify(result, null, 2));
         this.logOutput('Waiting for server callback...');
+        
+        // Store the request ID for polling
+        if (result.request_id) {
+          this.currentRequestId = result.request_id;
+          
+          // Poll for the result every 1 second
+          this.pollInterval = setInterval(() => {
+            this.pollForCallbackResult(this.currentRequestId);
+          }, 1000);
+          
+          // Stop polling after 10 seconds to prevent infinite polling
+          setTimeout(() => {
+            if (this.pollInterval) {
+              clearInterval(this.pollInterval);
+              this.pollInterval = null;
+              this.logOutput('Stopped polling for callback result after timeout');
+            }
+          }, 10000);
+        }
       })
       .catch((e) => {
         this.logOutput('Error: ' + e.message);
@@ -183,6 +197,48 @@ export class DoubleCallClient extends JRPCClient {
       });
     } else {
       this.logOutput('Error: DoubleCallTestClass.double_call_test method not found');
+    }
+  }
+  
+  /** Poll for callback result
+  */
+  pollForCallbackResult(requestId) {
+    if (this.server['DoubleCallTestClass.get_callback_result'] != null) {
+      this.server['DoubleCallTestClass.get_callback_result'](requestId)
+      .then((result) => {
+        if (result.callback_status === 'completed') {
+          this.logOutput('<<< Callback result received:');
+          this.logOutput(JSON.stringify(result, null, 2));
+          
+          // Stop polling once we have the result
+          if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+            this.pollInterval = null;
+          }
+        } else if (result.callback_status === 'error') {
+          this.logOutput('<<< Callback error:');
+          this.logOutput(JSON.stringify(result, null, 2));
+          
+          // Stop polling on error
+          if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+            this.pollInterval = null;
+          }
+        } else {
+          // Still pending, continue polling
+          this.logOutput(`Callback status: ${result.callback_status}`);
+        }
+      })
+      .catch((e) => {
+        this.logOutput('Error polling for callback result: ' + e.message);
+        console.error(e);
+        
+        // Stop polling on error
+        if (this.pollInterval) {
+          clearInterval(this.pollInterval);
+          this.pollInterval = null;
+        }
+      });
     }
   }
 
@@ -228,24 +284,18 @@ export class DoubleCallClient extends JRPCClient {
 
   /** Client callback method that the server can call
   */
-  client_callback(param1, param2, param3) {
+  client_callback(msg) {
     this.callbackCount++;
+    
+    const userInput = window.prompt('hi press and key');
+    console.log('userInput', userInput);
     
     this.logOutput('*** SERVER CALLBACK RECEIVED ***');
     this.logOutput(`Callback #${this.callbackCount}`);
-    this.logOutput(`Param 1: ${param1}`);
-    this.logOutput(`Param 2: ${param2}`);
-    this.logOutput(`Param 3: ${param3}`);
-    
+    this.logOutput(`msg: ${msg}`);
+  
     // Return response to server
-    const response = {
-      status: 'callback_received',
-      callback_count: this.callbackCount,
-      received_at: new Date().toISOString(),
-      echo_param1: param1,
-      echo_param2: param2,
-      echo_param3: param3
-    };
+    const response = 'returning from js'
     
     this.logOutput('Sending callback response to server...');
     
