@@ -3,6 +3,7 @@ Server implementation for JRPC over WebSockets.
 """
 import asyncio
 import websockets
+import ssl
 from typing import Optional, Dict, Any
 
 from .JRPCCommon import JRPCCommon
@@ -11,23 +12,26 @@ from .JRPCCommon import JRPCCommon
 class JRPCServer(JRPCCommon):
     """Server implementation for JRPC over WebSockets."""
     
-    def __init__(self, port: int = 9000, remote_timeout: int = 60):
+    def __init__(self, port: int = 9000, remote_timeout: int = 60, ssl_context: Optional[ssl.SSLContext] = None):
         """Initialize the JRPC server.
         
         Args:
             port: Port to listen on
             remote_timeout: Timeout for remote connections in seconds
+            ssl_context: Optional SSL context for secure connections
         """
         super().__init__()
         self.port = port
         self.remote_timeout = remote_timeout
         self.server = None
         self.clients = {}
+        self.ssl_context = ssl_context
         
     async def start(self):
         """Start the WebSocket server."""
-        self.server = await websockets.serve(self.handle_connection, "0.0.0.0", self.port)
-        print(f"JRPC Server started on port {self.port}")
+        self.server = await websockets.serve(self.handle_connection, "0.0.0.0", self.port, ssl=self.ssl_context)
+        protocol = "WSS" if self.ssl_context else "WS"
+        print(f"JRPC Server started on port {self.port} with {protocol} protocol")
         
     async def handle_connection(self, websocket):
         """Handle a new WebSocket connection.

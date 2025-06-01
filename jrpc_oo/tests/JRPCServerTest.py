@@ -6,9 +6,13 @@ import asyncio
 import sys
 import os
 import json
+import ssl
+import shutil
+import subprocess
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from jrpc_oo.JRPCServer import JRPCServer
+from jrpc_oo.cert import Cert
 
 
 class TestClass:
@@ -71,9 +75,56 @@ async def main():
     """Main function to set up the server."""
     # Parse command-line arguments
     use_ssl = not ('--no_wss' in sys.argv or 'no_wss' in sys.argv)
+    debug = '--debug' in sys.argv
     
-    # Create server
-    jrpc_server = JRPCServer(port=9000, remote_timeout=60)
+    # Setup SSL if requested
+    ssl_context = None
+    if use_ssl:
+        print("Setting up SSL certificates for WSS connection...")
+        
+        # Create cert directory in a location that works better with JavaScript
+        cert_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "certs")
+        os.makedirs(cert_dir, exist_ok=True)
+        
+        # Initialize certificate manager with the specific cert directory
+        cert_manager = Cert(domain="localhost", cert_dir=cert_dir)
+        success, message = cert_manager.generate_cert()
+        print(message)
+        
+        # Check if certutil is available for browser integration
+        def is_certutil_available():
+            return shutil.which("certutil") is not None
+        
+        if not is_certutil_available():
+            print("Warning: 'certutil' is not available, so the CA can't be automatically installed in Firefox and/or Chrome/Chromium! ⚠️")
+            print("Install 'certutil' with 'apt install libnss3-tools' and re-run 'mkcert -install' 👈")
+        
+        if success:
+            cert_path, key_path = cert_manager.get_cert_paths()
+            print(f"Using SSL certificates:")
+            print(f"Certificate: {cert_path}")
+            print(f"Key: {key_path}")
+            
+            
+            # Create SSL context for Python server
+            try:
+                ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                ssl_context.load_cert_chain(cert_path, key_path)
+                print("SSL context created successfully for Python server")
+            except Exception as e:
+                print(f"Error creating SSL context: {e}")
+                print("Falling back to WS connection")
+                use_ssl = False
+                ssl_context = None
+        else:
+            print("Failed to generate SSL certificates, falling back to WS")
+            use_ssl = False
+    
+    # Create server with SSL if available
+    if use_ssl and ssl_context:
+        jrpc_server = JRPCServer(port=9000, remote_timeout=60, ssl_context=ssl_context)
+    else:
+        jrpc_server = JRPCServer(port=9000, remote_timeout=60)
     
     # Create test class instance
     tc2 = TestClass2()
@@ -90,7 +141,17 @@ async def main():
     # Start server
     await jrpc_server.start()
     
-    print(f"Server started on port 9000 with {'WSS' if use_ssl else 'WS'} protocol")
+    protocol = "WSS" if use_ssl else "WS"
+    print(f"Server started on port 9000 with {protocol} protocol")
+    print(f"Connect to: {protocol.lower()}://localhost:9000")
+    
+    # Print certificate information for verification
+    if use_ssl and ssl_context:
+        print("\nCertificate locations for JavaScript client:")
+        print(f"- ./cert/server.crt")
+        print(f"- ./cert/server.key")
+        print("\nWhen running JRPCServerTest.js in the same directory, you should be able to use SSL")
+        print("without explicitly generating certificates in the JavaScript code.")
     
     try:
         # Keep server running indefinitely

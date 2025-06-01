@@ -1,4 +1,5 @@
 *~
+!jrpc_oo/cert.py
 cert*
 node_modules
 package-lock.json
