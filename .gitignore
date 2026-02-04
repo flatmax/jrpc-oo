@@ -11,3 +11,5 @@ package-lock.json
 *.tgz
 **/build
 .aicoder/
+playwright-report/
+test-results/

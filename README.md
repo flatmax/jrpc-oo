@@ -1,243 +1,336 @@
 # jrpc-oo
 
-Expose objects over the network using the JSON-RPC 2.0 protocol. This repository provides implementations in Node.js, LitElement (Web Components), and Python, allowing seamless RPC communication between different platforms.
+Expose objects over the network using JSON-RPC 2.0 over WebSockets. Implementations for Node.js, LitElement (browser), and Python enable seamless cross-platform RPC communication.
 
 ## Table of Contents
+
 - [Features](#features)
-- [Implementations](#implementations)
-  - [Node.js](#nodejs)
-  - [LitElement (Web Components)](#litelement-web-components)
-  - [Python](#python)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
 - [RPC Calling Pattern](#rpc-calling-pattern)
-- [Example Usage](#example-usage)
-  - [Node.js Server Example](#nodejs-server-example)
-  - [Browser Client Example](#browser-client-example-litelement)
-  - [Python Example](#python-example)
-- [Getting Started](#getting-started)
-- [Integration](#integration)
-- [Security](#security)
+- [Node.js](#nodejs)
+  - [Server](#nodejs-server)
+  - [Client](#nodejs-client)
+- [Browser (LitElement)](#browser-litelement)
+- [Python](#python)
+  - [Server](#python-server)
+  - [Client](#python-client)
+- [Bidirectional Communication](#bidirectional-communication)
+- [Running the Demos](#running-the-demos)
+- [Security (WSS)](#security-wss)
 - [License](#license)
 
 ## Features
 
-- JSON-RPC 2.0 protocol implementation
-- WebSocket-based communication
-- Bidirectional RPC calls:
-  - Server can call client methods
-  - Client can call server methods
-  - Enables true peer-to-peer communication
-- Multiple language support:
-  - Node.js server and client
-  - LitElement web components for browser integration
-  - Python server and client
-- Automatic function exposure and remote execution
-- Secure WebSocket support (WSS)
-- Bidirectional communication
+- **JSON-RPC 2.0** protocol over WebSockets
+- **Bidirectional RPC**: Server can call client methods and vice versa
+- **Cross-platform**: Node.js, Browser (LitElement), and Python implementations
+- **Automatic method exposure**: Simply add a class and all its methods become callable
+- **Multiple client support**: Server can manage many connected clients
+- **Secure WebSocket (WSS)** support with certificate generation
 
-## Implementations
+## Installation
 
-### Node.js
-- Server implementation in `JRPCServer.js`
-- Client implementation in `JRPCNodeClient.js`
-- Support for automatic class method exposure
-- WebSocket-based communication
+### Node.js / Browser
 
-### LitElement (Web Components)
-- Browser-based client implementation in `jrpc-client.js`
-- Material Design components integration
-- Automatic UI generation for exposed methods
-- WebSocket client capabilities
+```bash
+npm install
+```
 
 ### Python
-- Server implementation in `python/jrpc_server.py`
-- Client implementation in `python/jrpc_client.py`
-- Compatible with Node.js and browser clients
-- Async/await support using websockets
+
+```bash
+pip install -e .
+# Or install dependencies directly:
+pip install websockets asyncio
+```
+
+## Quick Start
+
+### 1. Start a Server (Node.js)
+
+```bash
+./JRPCServerTest.js
+```
+
+### 2. Connect a Client (Browser)
+
+```bash
+npm start
+# Visit https://0.0.0.0:8081
+```
+
+### 3. Or Connect a Python Client
+
+```bash
+python jrpc_oo/tests/JRPCClientTest.py ws://0.0.0.0:9000
+```
 
 ## RPC Calling Pattern
 
-All implementations (Node.js, Python, and Browser) use the same consistent pattern for making RPC calls:
+All implementations use the same consistent pattern:
 
-```javascript
-// Standard RPC calling pattern
-jrpcObject['ClassName.methodName'](arg1, arg2, ...)
-
-// Examples:
-// JavaScript/Browser
-client['Calculator.add'](2, 3)
-  .then(result => console.log(result))
-  .catch(error => console.error(error));
-
-// Python (with async/await)
-result = await client['Calculator.add'](2, 3)
-
-// Node.js
-client['TestClass.fn2'](arg1, arg2)
-  .then(result => console.log(result))
-  .catch(error => console.error(error));
+```
+object['ClassName.methodName'](arg1, arg2, ...)
 ```
 
-This consistent pattern ensures that RPC calls work the same way across all implementations, making it easier to:
-- Switch between different implementations
-- Write cross-platform code
-- Understand and maintain the codebase
+| Platform | Syntax |
+|----------|--------|
+| JavaScript | `this.server['TestClass.fn2'](arg1, arg2).then(result => ...)` |
+| Python | `result = await self.server['TestClass.fn2'](arg1, arg2)` |
 
-## Example Usage
+Call all connected remotes:
 
-### Node.js Server Example
+| Platform | Syntax |
+|----------|--------|
+| JavaScript | `this.call['ClassName.method'](args).then(results => ...)` |
+| Python | `results = await self.call['ClassName.method'](args)` |
+
+Results from `call` return a dictionary: `{uuid: result, ...}` for each connected remote.
+
+## Node.js
+
+### Node.js Server
+
 ```javascript
-JRPCServer = require('./JRPCServer');
+const JRPCServer = require('./JRPCServer');
 
-class TestClass {
-  fn2(arg1, arg2){
-    console.log('fn2');
-    console.log('arg1 :', JSON.stringify(arg1, null, 2));
-    console.log('arg2 :', JSON.stringify(arg2, null, 2));
-    return arg1;
+class Calculator {
+  add(a, b) {
+    return a + b;
+  }
+  
+  multiply(a, b) {
+    return a * b;
   }
 }
 
-let tc = new TestClass;
-var JrpcServer = new JRPCServer.JRPCServer(9000); // start a server on port 9000
-JrpcServer.addClass(tc); // setup the class for remote use
+const calc = new Calculator();
+const server = new JRPCServer.JRPCServer(9000, 60, false); // port, timeout, ssl
+server.addClass(calc);
+
+console.log('Server running on ws://0.0.0.0:9000');
 ```
 
-### Browser Client Example (LitElement)
+### Node.js Client
+
 ```javascript
-import {JRPCClient} from '../jrpc-client.js';
-import {html} from 'lit';
-import '@material/mwc-button';
+const JRPCNodeClient = require('./JRPCNodeClient').JRPCNodeClient;
 
-export class LocalJRPC extends JRPCClient {
-  firstUpdated() {
-    this.serverURI = "wss://0.0.0.0:9000";
-  }
-
-  render() {
-    return html`
-      <mwc-button raised
-        @click=${this.testArgPass}
-        >TestClass.fn2 arg test</mwc-button>
-    `;
-  }
-
-  testArgPass() {
-    this.call['TestClass.fn2'](1, {0: 'test', 1: [1, 2]})
-      .then((result) => console.log(result))
-      .catch((e) => console.error(e.message));
+class ClientMethods {
+  // Methods here can be called by the server
+  notify(message) {
+    console.log('Server says:', message);
+    return 'received';
   }
 }
 
-window.customElements.define('local-jrpc', LocalJRPC);
+const client = new JRPCNodeClient('ws://0.0.0.0:9000');
+client.addClass(new ClientMethods());
+
+// Once connected, call server methods:
+// client.server['Calculator.add'](2, 3).then(result => console.log(result));
 ```
 
-### Python Example
+## Browser (LitElement)
+
+```javascript
+import { JRPCClient } from './jrpc-client.js';
+
+class MyApp extends JRPCClient {
+  constructor() {
+    super();
+    this.remoteTimeout = 60;
+  }
+
+  // Called when connection is ready
+  setupDone() {
+    // Now you can call server methods
+    this.testCalculator();
+  }
+
+  async testCalculator() {
+    try {
+      const sum = await this.server['Calculator.add'](5, 3);
+      console.log('5 + 3 =', sum);
+      
+      const product = await this.server['Calculator.multiply'](4, 7);
+      console.log('4 * 7 =', product);
+    } catch (e) {
+      console.error('RPC error:', e);
+    }
+  }
+
+  // This method can be called BY the server
+  showAlert(message) {
+    alert(message);
+    return 'alert shown';
+  }
+}
+
+customElements.define('my-app', MyApp);
+```
+
+```html
+<my-app serverURI="ws://0.0.0.0:9000"></my-app>
+```
+
+## Python
+
+### Python Server
+
 ```python
-# Server
-from python.jrpc_server import JRPCServer
+import asyncio
+from jrpc_oo import JRPCServer
 
 class Calculator:
     def add(self, a, b):
-        return {"result": a + b}
+        return a + b
+    
+    def multiply(self, a, b):
+        return a * b
 
-# Create the instance that will be resident on the server
-calculator = Calculator()
+async def main():
+    server = JRPCServer(port=9000)
+    server.add_class(Calculator())
+    
+    await server.start()
+    print('Server running on ws://0.0.0.0:9000')
+    
+    # Keep running
+    await asyncio.Future()
 
-# Create server and add the calculator instance
-server = JRPCServer(host='localhost', port=8080)
-server.add_instance(calculator)
-server.start()
-
-# Client
-from python.jrpc_client import JRPCClient
-
-client = JRPCClient('ws://localhost:8080')
-result = await client['Calculator.add'](1, 2)
-print(result)  # {"result": 3}
+asyncio.run(main())
 ```
 
-## Getting Started
+### Python Client
 
-1. Install dependencies:
-   ```bash
-   npm install  # For Node.js/Browser
-   pip install -r python/requirements.txt  # For Python
-   ```
+```python
+import asyncio
+from jrpc_oo import JRPCClient
 
-2. Start the server:
-   ```bash
-   # Node.js server
-   ./JRPCServerTest.js
-   
-   # OR Python server
-   python python/server.py
-   ```
+class ClientMethods:
+    """Methods the server can call on this client."""
+    def notify(self, message):
+        print(f'Server says: {message}')
+        return 'received'
 
-3. For web application demo:
-   ```bash
-   npm start
-   ```
-   Then:
-   - Clear cert issues: visit https://0.0.0.0:9000
-   - Access demo: https://0.0.0.0:8081
+async def main():
+    client = JRPCClient('ws://0.0.0.0:9000')
+    client.add_class(ClientMethods())
+    
+    # Connect and wait for setup
+    connect_task = asyncio.create_task(client.connect())
+    
+    # Wait for connection
+    await asyncio.sleep(2)
+    
+    if client.connected:
+        # Call server methods
+        result = await client.server['Calculator.add'](10, 20)
+        print(f'10 + 20 = {result}')
+        
+        result = await client.server['Calculator.multiply'](6, 7)
+        print(f'6 * 7 = {result}')
+    
+    await connect_task
 
-## Integration
+asyncio.run(main())
+```
 
-- See the jrpc-lit-node repo for Node.js/LitElement integration examples
-- Python implementation can be integrated directly into any async Python application
+## Bidirectional Communication
 
-## Security
+The server can call methods on connected clients:
 
-- Uses WSS (WebSocket Secure) for encrypted communication
-- Certificate generation scripts included in repository
-- Proper error handling and input validation
+### Server Side (Node.js)
+
+```javascript
+class ServerClass {
+  constructor() {
+    // get_server() is added when class is registered
+  }
+  
+  async triggerClientAlert() {
+    // Call method on connected client
+    const result = await this.getServer()['ClientMethods.showAlert']('Hello from server!');
+    console.log('Client responded:', result);
+  }
+}
+```
+
+### Server Side (Python)
+
+```python
+class ServerClass:
+    async def trigger_client_alert(self):
+        # Call method on connected client
+        result = await self.get_server()['ClientMethods.show_alert']('Hello from server!')
+        print(f'Client responded: {result}')
+```
+
+## Running the Demos
+
+### Node.js Server + Browser Client
+
+```bash
+# Terminal 1: Start the server
+./JRPCServerTest.js
+
+# Terminal 2: Start the web server
+npm start
+
+# Browser: Visit https://0.0.0.0:8081
+# (First visit https://0.0.0.0:9000 to accept the self-signed certificate)
+```
+
+### Node.js Server + Multiple Node.js Clients
+
+```bash
+./tests/multiTest.sh
+```
+
+### Python Server + Browser Client
+
+```bash
+# Terminal 1: Start Python server
+python jrpc_oo/tests/JRPCServerTest.py no_wss
+
+# Terminal 2: Start web server
+npm run start:no_wss
+
+# Browser: Visit http://0.0.0.0:8081
+```
+
+### Python Server + Python Client
+
+```bash
+# Terminal 1: Start server
+python jrpc_oo/tests/JRPCServerTest.py no_wss
+
+# Terminal 2: Connect client
+python jrpc_oo/tests/JRPCClientTest.py ws://0.0.0.0:9000
+```
+
+## Security (WSS)
+
+For secure WebSocket connections, certificates are auto-generated on first run:
+
+```bash
+# Node.js with WSS (default)
+./JRPCServerTest.js
+
+# Node.js without WSS
+./JRPCServerTest.js no_wss
+
+# Python with WSS (uses mkcert)
+python jrpc_oo/tests/JRPCServerTest.py
+
+# Python without WSS
+python jrpc_oo/tests/JRPCServerTest.py no_wss
+```
+
+When using WSS with self-signed certificates, visit `https://0.0.0.0:9000` in your browser first to accept the certificate.
 
 ## License
 
-See LICENSE file for details.
-
-# run the webapp demo :
-
-First install the requirements :
-```
-npm install
-```
-
-## setup the nodejs side
-
-```
-./JRPCServerTest.js
-```
-
-## setup the webapp
-
-To setup run the webapp (answer defaults to the key generation question) :
-```
-npm start
-```
-Now clear cert issues in the browser go to the following url to clear the websocket port 9000 : https://0.0.0.0:9000
-
-Now finally run the demo in the webapp : https://0.0.0.0:8081
-
-## in the webapp
-
-You will see the class TestClass functions exposed as buttons. Press some buttons and look at the nodejs side/browser console to see function executions and returned arguments.
-
-## integrate into your apps
-
-Have a look at the jrpc-lit-node repo for an example of integration.
-
-# run the nodejs demo :
-
-First install the requirements :
-```
-npm install
-```
-## run the server
-```
-./JRPCServerTest.js
-```
-## run the clients in parallel and test
-
-```
-./tests/multiTest.sh
+BSD-3-Clause. See [LICENSE](LICENSE) for details.

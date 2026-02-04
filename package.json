@@ -7,10 +7,15 @@
     "start": "./JRPCServerTest.sh",
     "start:dist": "./JRPCServerTest-dist.sh",
     "start:no_wss": "./JRPCServerTest.sh no_wss",
-    "build": "rollup -c"
+    "build": "rollup -c",
+    "test:install": "npx playwright install chromium",
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui",
+    "test:debug": "npx playwright test --debug"
   },
   "devDependencies": {
     "@material/mwc-button": "^0.22.1",
+    "@playwright/test": "^1.40.0",
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",
     "@rollup/plugin-replace": "^6.0.2",
@@ -19,7 +24,7 @@
   },
   "dependencies": {
     "jrpc": "^3.1.2",
-    "lit": "^2.0.2",
+    "lit": "^3.0.0",
     "ws": "^8.3.0"
   },
   "author": "Flatmax Pty Ltd",
