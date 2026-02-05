@@ -440,5 +440,155 @@ class TestJRPC2ProtocolCompliance:
         assert method_called, "Single message should be processed"
 
 
+class TestExposeClassAsyncMethods:
+    """Tests for async method support in ExposeClass (Issue 3.4)."""
+    
+    @pytest.mark.asyncio
+    async def test_async_method_exposed_and_callable(self):
+        """Async methods should be properly awaited and return results."""
+        
+        class AsyncService:
+            async def async_add(self, a, b):
+                await asyncio.sleep(0.01)  # Simulate async work
+                return a + b
+        
+        expose = ExposeClass()
+        service = AsyncService()
+        exposed = expose.expose_all_fns(service)
+        
+        # Find the async_add function
+        add_fn = None
+        for name, fn in exposed.items():
+            if 'async_add' in name:
+                add_fn = fn
+                break
+        
+        assert add_fn is not None, "async_add should be exposed"
+        
+        # Test calling with args format
+        result_holder = {}
+        
+        def next_cb(err, result):
+            result_holder['err'] = err
+            result_holder['result'] = result
+        
+        add_fn({'args': [5, 7]}, next_cb)
+        
+        # Allow async task to complete
+        await asyncio.sleep(0.05)
+        
+        assert result_holder.get('err') is None, f"Should not have error: {result_holder.get('err')}"
+        assert result_holder.get('result') == 12, "5 + 7 should equal 12"
+    
+    @pytest.mark.asyncio
+    async def test_async_method_error_handling(self):
+        """Async methods that raise exceptions should return errors."""
+        
+        class FailingService:
+            async def async_fail(self):
+                await asyncio.sleep(0.01)
+                raise ValueError("Intentional failure")
+        
+        expose = ExposeClass()
+        service = FailingService()
+        exposed = expose.expose_all_fns(service)
+        
+        fail_fn = None
+        for name, fn in exposed.items():
+            if 'async_fail' in name:
+                fail_fn = fn
+                break
+        
+        assert fail_fn is not None, "async_fail should be exposed"
+        
+        result_holder = {}
+        
+        def next_cb(err, result):
+            result_holder['err'] = err
+            result_holder['result'] = result
+        
+        fail_fn({'args': []}, next_cb)
+        
+        await asyncio.sleep(0.05)
+        
+        assert result_holder.get('err') is not None, "Should have error"
+        assert 'Intentional failure' in str(result_holder.get('err')), "Error message should be passed"
+
+
+class TestJRPC2Timeout:
+    """Tests for request timeout handling (Issue 3.2)."""
+    
+    @pytest.mark.asyncio
+    async def test_request_timeout_triggers_callback(self):
+        """Request that times out should invoke callback with error."""
+        # Use a very short timeout for testing
+        jrpc = JRPC2(remote_timeout=0.1)
+        
+        callback_called = False
+        callback_error = None
+        
+        def callback(err, result):
+            nonlocal callback_called, callback_error
+            callback_called = True
+            callback_error = err
+        
+        # Mock transmitter that doesn't respond
+        async def mock_transmit(msg, next_cb):
+            next_cb(False)  # Transmission succeeds but no response
+        
+        jrpc.set_transmitter(mock_transmit)
+        
+        # Make a call that will never get a response
+        jrpc.call('nonexistent.method', {}, callback)
+        
+        # Wait for timeout
+        await asyncio.sleep(0.15)
+        
+        assert callback_called, "Callback should be invoked after timeout"
+        assert callback_error is not None, "Error should be set"
+        assert 'timeout' in str(callback_error).lower(), "Error should mention timeout"
+    
+    @pytest.mark.asyncio
+    async def test_response_before_timeout_no_error(self):
+        """Response received before timeout should not trigger timeout error."""
+        jrpc = JRPC2(remote_timeout=0.5)
+        
+        callback_count = 0
+        callback_results = []
+        
+        def callback(err, result):
+            nonlocal callback_count
+            callback_count += 1
+            callback_results.append((err, result))
+        
+        # Mock transmitter that we'll use to simulate response
+        async def mock_transmit(msg, next_cb):
+            next_cb(False)
+        
+        jrpc.set_transmitter(mock_transmit)
+        
+        # Make a call
+        jrpc.call('test.method', {}, callback)
+        
+        # Get the request_id from the pending request
+        request_id = list(jrpc.requests.keys())[0]
+        
+        # Simulate receiving a response immediately
+        response = json.dumps({
+            'jsonrpc': '2.0',
+            'id': request_id,
+            'result': 'success'
+        })
+        jrpc.receive(response)
+        
+        # Wait past the timeout period
+        await asyncio.sleep(0.6)
+        
+        # Callback should only be called once (for the response, not timeout)
+        assert callback_count == 1, f"Callback should be called exactly once, was called {callback_count} times"
+        assert callback_results[0][0] is None, "First call should have no error"
+        assert callback_results[0][1] == 'success', "First call should have result"
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

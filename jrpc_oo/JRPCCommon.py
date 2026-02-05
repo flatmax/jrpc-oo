@@ -34,11 +34,6 @@ class JRPCCommon:
         self.classes = []  # List of exposed class objects
         self.call = {}     # Function to call all remotes with the same method
         self.server = {}   # Legacy: Functions mapped to a particular remote
-        
-        # Make sure we don't conflict with attributes
-        if hasattr(self, 'server') and not isinstance(self.server, dict):
-            self._original_server = self.server  # Preserve any existing server attribute
-            self.server = {}
         self.remote_timeout = 60
         
     def new_remote(self) -> JRPC2:

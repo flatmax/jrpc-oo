@@ -76,6 +76,15 @@ class JRPC2:
                 callback(Exception(f"Failed to send request: {error}"), None)
         
         asyncio.create_task(self._transmit_message(json.dumps(request), next_cb))
+        
+        # Schedule timeout cleanup
+        async def timeout_handler():
+            await asyncio.sleep(self.remote_timeout)
+            if request_id in self.requests:
+                cb = self.requests.pop(request_id)
+                cb(Exception(f"Request timeout after {self.remote_timeout}s for method: {method}"), None)
+        
+        asyncio.create_task(timeout_handler())
     
     async def _transmit_message(self, message, next_cb):
         """Handle message transmission with proper awaiting for async transmitters.

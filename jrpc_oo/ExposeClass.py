@@ -1,6 +1,7 @@
 """
 Class to expose another class's methods for use with JRPC.
 """
+import asyncio
 import inspect
 from typing import Any, Dict, List, Callable, Optional
 
@@ -78,6 +79,18 @@ class ExposeClass:
                     else:
                         # For direct calls without args wrapping
                         result = method(params)
+                    
+                    # Handle async methods
+                    if asyncio.iscoroutine(result):
+                        async def await_and_callback():
+                            try:
+                                actual_result = await result
+                                return next_cb(None, actual_result)
+                            except Exception as e:
+                                print(f"Async method failed: {e}")
+                                return next_cb(str(e), None)
+                        asyncio.create_task(await_and_callback())
+                        return  # Don't call next_cb here, it will be called after await
                         
                     return next_cb(None, result)
                 except Exception as e:

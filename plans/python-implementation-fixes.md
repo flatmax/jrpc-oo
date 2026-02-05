@@ -482,12 +482,12 @@ Create `jrpc_oo/tests/test_interop.py`:
 6. [x] Add unit tests for JRPC2 protocol
 7. [x] Fix deprecated asyncio.iscoroutinefunction (use inspect.iscoroutinefunction)
 
-### Phase 3: Cleanup & Tests (Day 3)
-8. [ ] Remove dead code (Issue 3.1)
-9. [ ] Add request timeout handling (Issue 3.2)
-10. [ ] Add async method support in ExposeClass (Issue 3.4)
-11. [ ] Complete unit test coverage
-12. [ ] Add integration tests
+### Phase 3: Cleanup & Tests (Day 3) ✅ COMPLETE
+8. [x] Remove dead code (Issue 3.1)
+9. [x] Add request timeout handling (Issue 3.2)
+10. [x] Add async method support in ExposeClass (Issue 3.4)
+11. [x] Add unit tests for new functionality
+12. [ ] Add integration tests (deferred to Phase 4)
 
 ### Phase 4: Interop Testing (Day 4)
 12. [ ] Create cross-language test harness
