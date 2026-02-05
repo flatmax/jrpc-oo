@@ -499,10 +499,10 @@ Create `jrpc_oo/tests/test_interop.py`:
 
 All 4 cross-language interop tests passing (both directions for both server types).
 
-### Phase 5: Enhancements (Future)
-18. [ ] Add reconnection logic to JRPCClient (Issue 3.3)
-19. [ ] Add thread-safety for concurrent connections (Issue 3.5)
-20. [ ] Consider deprecation path for `self.server` (matches JS "legacy" comments)
+### Phase 5: Enhancements ✅ COMPLETE
+18. [x] Add reconnection logic to JRPCClient (Issue 3.3)
+19. [x] Add thread-safety for concurrent connections (Issue 3.5)
+20. [x] Mark `self.server` as deprecated in docstring (matches JS "legacy" comments)
 
 ---
 

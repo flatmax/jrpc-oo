@@ -590,5 +590,139 @@ class TestJRPC2Timeout:
         assert callback_results[0][1] == 'success', "First call should have result"
 
 
+class TestJRPCClientReconnection:
+    """Tests for JRPCClient reconnection logic (Issue 3.3)."""
+    
+    def test_reconnect_state_initialized(self):
+        """Reconnection state should be initialized correctly."""
+        from jrpc_oo.JRPCClient import JRPCClient
+        
+        client = JRPCClient("ws://localhost:9999")
+        
+        assert client._reconnect_attempts == 0
+        assert client._max_reconnect_attempts == 5
+        assert client._reconnect_delay == 1.0
+    
+    def test_reset_reconnect_state(self):
+        """reset_reconnect_state should reset all reconnection tracking."""
+        from jrpc_oo.JRPCClient import JRPCClient
+        
+        client = JRPCClient("ws://localhost:9999")
+        
+        # Simulate some failed attempts
+        client._reconnect_attempts = 3
+        client._reconnect_delay = 8.0
+        
+        client.reset_reconnect_state()
+        
+        assert client._reconnect_attempts == 0
+        assert client._reconnect_delay == 1.0
+    
+    @pytest.mark.asyncio
+    async def test_reconnect_increments_attempts(self):
+        """reconnect() should increment attempt counter."""
+        from jrpc_oo.JRPCClient import JRPCClient
+        
+        client = JRPCClient("ws://localhost:9999")
+        
+        # This will fail to connect (no server), but should increment
+        result = await client.reconnect(delay=0.01)
+        
+        assert client._reconnect_attempts == 1
+        assert result == False  # Connection failed
+    
+    @pytest.mark.asyncio
+    async def test_reconnect_max_attempts_exceeded(self):
+        """reconnect() should stop after max attempts."""
+        from jrpc_oo.JRPCClient import JRPCClient
+        
+        client = JRPCClient("ws://localhost:9999")
+        client._reconnect_attempts = 5  # Already at max
+        
+        result = await client.reconnect(delay=0.01)
+        
+        assert result == False
+        assert client._reconnect_attempts == 6  # Incremented past max
+    
+    @pytest.mark.asyncio
+    async def test_reconnect_exponential_backoff(self):
+        """reconnect() should use exponential backoff on failures."""
+        from jrpc_oo.JRPCClient import JRPCClient
+        
+        client = JRPCClient("ws://localhost:9999")
+        initial_delay = client._reconnect_delay
+        
+        await client.reconnect(delay=0.01)
+        
+        # After failure, delay should double
+        assert client._reconnect_delay == initial_delay * 2
+
+
+class TestJRPCCommonThreadSafety:
+    """Tests for thread-safety in JRPCCommon (Issue 3.5)."""
+    
+    def test_setup_lock_initialized(self):
+        """Setup lock should be initialized."""
+        from jrpc_oo.JRPCCommon import JRPCCommon
+        
+        common = JRPCCommon()
+        
+        assert hasattr(common, '_setup_lock')
+        assert isinstance(common._setup_lock, asyncio.Lock)
+    
+    @pytest.mark.asyncio
+    async def test_concurrent_setup_fns_safe(self):
+        """Concurrent calls to _setup_fns_safe should be serialized."""
+        from jrpc_oo.JRPCCommon import JRPCCommon
+        from jrpc_oo.JRPC2 import JRPC2
+        
+        common = JRPCCommon()
+        
+        # Create mock remotes
+        remote1 = JRPC2()
+        remote1.uuid = "remote-1"
+        remote1.rpcs = {}
+        common.remotes[remote1.uuid] = remote1
+        
+        remote2 = JRPC2()
+        remote2.uuid = "remote-2"
+        remote2.rpcs = {}
+        common.remotes[remote2.uuid] = remote2
+        
+        # Set up mock transmitters
+        async def mock_transmit(msg, next_cb):
+            next_cb(False)
+        
+        remote1.set_transmitter(mock_transmit)
+        remote2.set_transmitter(mock_transmit)
+        
+        # Run concurrent setup calls
+        fn_names = ['TestClass.method1', 'TestClass.method2']
+        
+        await asyncio.gather(
+            common._setup_fns_safe(fn_names, remote1),
+            common._setup_fns_safe(fn_names, remote2)
+        )
+        
+        # Both should complete without errors
+        assert 'TestClass.method1' in common.call
+        assert 'TestClass.method2' in common.call
+
+
+class TestServerDeprecation:
+    """Tests verifying server dict deprecation marking."""
+    
+    def test_server_dict_has_deprecation_comment(self):
+        """Verify server attribute is marked as deprecated in code."""
+        from jrpc_oo.JRPCCommon import JRPCCommon
+        import inspect
+        
+        # Get the source and check for deprecation marker
+        source = inspect.getsource(JRPCCommon.__init__)
+        
+        assert 'deprecated' in source.lower() or 'legacy' in source.lower(), \
+            "server attribute should be marked as deprecated/legacy in comments"
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

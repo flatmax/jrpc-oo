@@ -33,8 +33,9 @@ class JRPCCommon:
         self.remotes = {}  # Maps UUID to remote
         self.classes = []  # List of exposed class objects
         self.call = {}     # Function to call all remotes with the same method
-        self.server = {}   # Legacy: Functions mapped to a particular remote
+        self.server = {}   # Legacy: Functions mapped to a particular remote (deprecated)
         self.remote_timeout = 60
+        self._setup_lock = asyncio.Lock()
         
     def new_remote(self) -> JRPC2:
         """Instantiate a new remote. It gets added to the array of remotes.
@@ -189,8 +190,19 @@ class JRPCCommon:
         else:
             print(f"Unexpected result type from system.listComponents: {type(result)}")
             fn_names = []
-            
-        self.setup_fns(fn_names, remote)
+        
+        # Use async-safe setup
+        asyncio.create_task(self._setup_fns_safe(fn_names, remote))
+    
+    async def _setup_fns_safe(self, fn_names, remote):
+        """Thread-safe wrapper for setup_fns.
+        
+        Args:
+            fn_names: Functions to make available
+            remote: The remote to call
+        """
+        async with self._setup_lock:
+            self.setup_fns(fn_names, remote)
     
     def setup_fns(self, fn_names, remote):
         """Set up functions for calling on the server.

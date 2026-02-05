@@ -3,7 +3,8 @@ Client implementation for JRPC over WebSockets.
 """
 import asyncio
 import websockets
-from typing import Optional, Dict, Any
+from typing import Optional
+
 
 from .JRPCCommon import JRPCCommon
 
@@ -23,6 +24,10 @@ class JRPCClient(JRPCCommon):
         self.remote_timeout = remote_timeout
         self.ws = None
         self.connected = False
+        self._message_task = None
+        self._reconnect_attempts = 0
+        self._max_reconnect_attempts = 5
+        self._reconnect_delay = 1.0
         
     async def connect(self):
         """Connect to the WebSocket server."""
@@ -82,3 +87,46 @@ class JRPCClient(JRPCCommon):
             await self.ws.close()
             self.connected = False
             print(f"Disconnected from {self.server_uri}")
+    
+    async def reconnect(self, delay: float = None):
+        """Attempt to reconnect to the server.
+        
+        Args:
+            delay: Optional delay before reconnecting (uses _reconnect_delay if not specified)
+            
+        Returns:
+            True if reconnection successful, False otherwise
+        """
+        if delay is None:
+            delay = self._reconnect_delay
+            
+        self._reconnect_attempts += 1
+        
+        if self._reconnect_attempts > self._max_reconnect_attempts:
+            print(f"Max reconnect attempts ({self._max_reconnect_attempts}) exceeded")
+            return False
+            
+        print(f"Reconnecting in {delay}s (attempt {self._reconnect_attempts}/{self._max_reconnect_attempts})...")
+        await asyncio.sleep(delay)
+        
+        # Store attempt count before connect() which may modify state
+        attempts_before = self._reconnect_attempts
+        
+        await self.connect()
+        
+        # Check if connection succeeded
+        if self.connected:
+            self._reconnect_attempts = 0  # Reset on success
+            self._reconnect_delay = 1.0
+            return True
+        else:
+            # Restore attempt count (connect resets it on internal failure)
+            self._reconnect_attempts = attempts_before
+            # Exponential backoff
+            self._reconnect_delay = min(self._reconnect_delay * 2, 30.0)
+            return False
+    
+    def reset_reconnect_state(self):
+        """Reset reconnection state (call after successful manual connect)."""
+        self._reconnect_attempts = 0
+        self._reconnect_delay = 1.0
