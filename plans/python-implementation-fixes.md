@@ -486,13 +486,15 @@ Create `jrpc_oo/tests/test_interop.py`:
 8. [x] Remove dead code (Issue 3.1)
 9. [x] Add request timeout handling (Issue 3.2)
 10. [x] Add async method support in ExposeClass (Issue 3.4)
-11. [x] Add unit tests for new functionality
-12. [ ] Add integration tests (deferred to Phase 4)
+11. [x] Add unit tests for new functionality (24 tests passing)
 
-### Phase 4: Interop Testing (Day 4)
-12. [ ] Create cross-language test harness
-13. [ ] Verify JS ↔ Python compatibility
-14. [ ] Document any behavioral differences
+### Phase 4: Interop Testing (Day 4) - IN PROGRESS
+12. [ ] Create Python integration tests (Python server + Python client)
+13. [ ] Create cross-language test harness
+14. [ ] Test: Python client → JS server (JRPCServerTest.js)
+15. [ ] Test: JS client → Python server (JRPCServerTest.py)
+16. [ ] Test: Mixed clients (Python server with JS + Python clients)
+17. [ ] Document any behavioral differences
 
 ### Phase 5: Enhancements (Future)
 15. [ ] Add reconnection logic to JRPCClient (Issue 3.3)
