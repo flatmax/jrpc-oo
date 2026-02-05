@@ -212,7 +212,7 @@ class JRPCCommon:
             # Create function in remote.rpcs
             async def remote_call(*args, fn_name=fn_name):
                 """Call a remote function and return a Promise."""
-                future = asyncio.get_event_loop().create_future()
+                future = asyncio.get_running_loop().create_future()
                 
                 def callback(err, result):
                     if err:

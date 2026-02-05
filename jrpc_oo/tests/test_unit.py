@@ -262,5 +262,183 @@ class TestExposeClass:
         assert result_holder.get('result') == 5, "2 + 3 should equal 5"
 
 
+class TestJRPC2NotificationHandling:
+    """Tests for JSON-RPC 2.0 notification handling (Issue 2.2)."""
+    
+    def test_notification_no_response_sent(self):
+        """T1.4: Notification (request without id) should not send response."""
+        jrpc = JRPC2()
+        responses_sent = []
+        
+        # Mock transmitter to capture outgoing messages
+        async def mock_transmit(msg, next_cb):
+            responses_sent.append(json.loads(msg))
+            next_cb(False)
+        
+        jrpc.set_transmitter(mock_transmit)
+        
+        # Add a test method
+        def test_method(params, next_cb):
+            next_cb(None, "method result")
+        
+        jrpc.methods["test.method"] = test_method
+        
+        # Send a notification (no 'id' field)
+        notification = json.dumps({
+            'jsonrpc': '2.0',
+            'method': 'test.method',
+            'params': {}
+        })
+        jrpc.receive(notification)
+        
+        # Give async tasks a chance to run (but there shouldn't be any response)
+        import asyncio
+        # No response should be queued for notifications
+        assert len(responses_sent) == 0, "Notification should not trigger a response"
+    
+    @pytest.mark.asyncio
+    async def test_request_with_id_sends_response(self):
+        """T1.5: Request with id should send response."""
+        jrpc = JRPC2()
+        responses_sent = []
+        
+        async def mock_transmit(msg, next_cb):
+            responses_sent.append(json.loads(msg))
+            next_cb(False)
+        
+        jrpc.set_transmitter(mock_transmit)
+        
+        def test_method(params, next_cb):
+            next_cb(None, "success result")
+        
+        jrpc.methods["test.method"] = test_method
+        
+        # Send request WITH id
+        request = json.dumps({
+            'jsonrpc': '2.0',
+            'id': 'req-123',
+            'method': 'test.method',
+            'params': {}
+        })
+        jrpc.receive(request)
+        
+        # Allow async tasks to run
+        await asyncio.sleep(0.01)
+        
+        assert len(responses_sent) == 1, "Request with id should trigger a response"
+        assert responses_sent[0]['id'] == 'req-123', "Response should have same id"
+        assert responses_sent[0]['result'] == "success result", "Response should contain result"
+    
+    def test_method_not_found_notification_no_error(self):
+        """Notification for unknown method should not send error response."""
+        jrpc = JRPC2()
+        responses_sent = []
+        
+        async def mock_transmit(msg, next_cb):
+            responses_sent.append(json.loads(msg))
+            next_cb(False)
+        
+        jrpc.set_transmitter(mock_transmit)
+        
+        # Send notification for non-existent method (no id)
+        notification = json.dumps({
+            'jsonrpc': '2.0',
+            'method': 'nonexistent.method',
+            'params': {}
+        })
+        jrpc.receive(notification)
+        
+        assert len(responses_sent) == 0, "Notification for unknown method should not send error"
+    
+    @pytest.mark.asyncio
+    async def test_method_not_found_request_sends_error(self):
+        """T1.6: Request for unknown method should send error response."""
+        jrpc = JRPC2()
+        responses_sent = []
+        
+        async def mock_transmit(msg, next_cb):
+            responses_sent.append(json.loads(msg))
+            next_cb(False)
+        
+        jrpc.set_transmitter(mock_transmit)
+        
+        # Send request for non-existent method (with id)
+        request = json.dumps({
+            'jsonrpc': '2.0',
+            'id': 'req-456',
+            'method': 'nonexistent.method',
+            'params': {}
+        })
+        jrpc.receive(request)
+        
+        # Allow async tasks to run
+        await asyncio.sleep(0.01)
+        
+        assert len(responses_sent) == 1, "Request for unknown method should send error"
+        assert 'error' in responses_sent[0], "Response should contain error"
+        assert responses_sent[0]['id'] == 'req-456', "Error response should have same id"
+
+
+class TestJRPC2ProtocolCompliance:
+    """Additional protocol compliance tests."""
+    
+    def test_response_with_null_result(self):
+        """Response with null/None result should still invoke callback."""
+        jrpc = JRPC2()
+        callback_called = False
+        callback_result = "not_set"
+        
+        def callback(err, result):
+            nonlocal callback_called, callback_result
+            callback_called = True
+            callback_result = result
+        
+        request_id = "test-null"
+        jrpc.requests[request_id] = callback
+        
+        message = json.dumps({
+            'jsonrpc': '2.0',
+            'id': request_id,
+            'result': None
+        })
+        jrpc.receive(message)
+        
+        assert callback_called, "Callback should be invoked for null result"
+        assert callback_result is None, "Result should be None"
+    
+    @pytest.mark.asyncio
+    async def test_batch_style_single_message(self):
+        """Single message should be processed (not as array)."""
+        jrpc = JRPC2()
+        method_called = False
+        responses_sent = []
+        
+        async def mock_transmit(msg, next_cb):
+            responses_sent.append(json.loads(msg))
+            next_cb(False)
+        
+        jrpc.set_transmitter(mock_transmit)
+        
+        def test_method(params, next_cb):
+            nonlocal method_called
+            method_called = True
+            next_cb(None, "ok")
+        
+        jrpc.methods["test.single"] = test_method
+        
+        message = json.dumps({
+            'jsonrpc': '2.0',
+            'method': 'test.single',
+            'params': {},
+            'id': '1'
+        })
+        jrpc.receive(message)
+        
+        # Allow async tasks to complete
+        await asyncio.sleep(0.01)
+        
+        assert method_called, "Single message should be processed"
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

@@ -2,6 +2,7 @@
 JSON-RPC 2.0 implementation for WebSockets.
 """
 import asyncio
+import inspect
 import json
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -85,7 +86,7 @@ class JRPC2:
         """
         try:
             if callable(self.transmitter):
-                if asyncio.iscoroutinefunction(self.transmitter):
+                if inspect.iscoroutinefunction(self.transmitter):
                     await self.transmitter(message, next_cb)
                 else:
                     self.transmitter(message, next_cb)
@@ -118,20 +119,24 @@ class JRPC2:
             elif 'method' in message:
                 method = message.get('method')
                 params = message.get('params', {})
-                request_id = message.get('id')
+                request_id = message.get('id')  # May be None for notifications
                 
                 if method in self.methods:
                     try:
                         # Create callback for sending response
+                        # Only respond if request_id is present (not a notification)
                         def response_callback(err, res):
-                            self._send_response(request_id, err, res)
+                            if request_id is not None:
+                                self._send_response(request_id, err, res)
                             
                         # Call method with parameters and callback
                         self.methods[method](params, response_callback)
                     except Exception as e:
-                        self._send_error(request_id, str(e))
+                        if request_id is not None:
+                            self._send_error(request_id, str(e))
                 else:
-                    self._send_error(request_id, f"Method not found: {method}")
+                    if request_id is not None:
+                        self._send_error(request_id, f"Method not found: {method}")
         
         except json.JSONDecodeError:
             print(f"Error decoding JSON message: {message_str}")

@@ -476,17 +476,18 @@ Create `jrpc_oo/tests/test_interop.py`:
 2. [x] Fix JRPCServer.py attribute collision (Issue 1.2)
 3. [x] Create basic unit tests for fixes (14 tests passing)
 
-### Phase 2: Medium Fixes (Day 2)
-4. [ ] Fix deprecated get_event_loop (Issue 2.1)
-5. [ ] Fix notification response handling (Issue 2.2)
-6. [ ] Add unit tests for JRPC2 protocol
+### Phase 2: Medium Fixes (Day 2) ✅ COMPLETE
+4. [x] Fix deprecated get_event_loop (Issue 2.1)
+5. [x] Fix notification response handling (Issue 2.2)
+6. [x] Add unit tests for JRPC2 protocol
+7. [x] Fix deprecated asyncio.iscoroutinefunction (use inspect.iscoroutinefunction)
 
 ### Phase 3: Cleanup & Tests (Day 3)
-7. [ ] Remove dead code (Issue 3.1)
-8. [ ] Add request timeout handling (Issue 3.2)
-9. [ ] Add async method support in ExposeClass (Issue 3.4)
-10. [ ] Complete unit test coverage
-11. [ ] Add integration tests
+8. [ ] Remove dead code (Issue 3.1)
+9. [ ] Add request timeout handling (Issue 3.2)
+10. [ ] Add async method support in ExposeClass (Issue 3.4)
+11. [ ] Complete unit test coverage
+12. [ ] Add integration tests
 
 ### Phase 4: Interop Testing (Day 4)
 12. [ ] Create cross-language test harness
