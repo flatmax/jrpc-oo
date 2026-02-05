@@ -23,13 +23,12 @@ class JRPCServer(JRPCCommon):
         super().__init__()
         self.port = port
         self.remote_timeout = remote_timeout
-        self.server = None
-        self.clients = {}
+        self.ws_server = None  # WebSocket server instance (renamed to avoid collision with parent's self.server dict)
         self.ssl_context = ssl_context
         
     async def start(self):
         """Start the WebSocket server."""
-        self.server = await websockets.serve(self.handle_connection, "0.0.0.0", self.port, ssl=self.ssl_context)
+        self.ws_server = await websockets.serve(self.handle_connection, "0.0.0.0", self.port, ssl=self.ssl_context)
         protocol = "WSS" if self.ssl_context else "WS"
         print(f"JRPC Server started on port {self.port} with {protocol} protocol")
         
@@ -76,7 +75,7 @@ class JRPCServer(JRPCCommon):
         
     async def stop(self):
         """Stop the WebSocket server."""
-        if self.server:
-            self.server.close()
-            await self.server.wait_closed()
+        if self.ws_server:
+            self.ws_server.close()
+            await self.ws_server.wait_closed()
             print("JRPC Server stopped")

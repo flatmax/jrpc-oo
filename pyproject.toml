@@ -28,9 +28,16 @@ dev = [
     "flake8",
     "black",
 ]
+test = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-timeout>=2.0",
+]
 
 [tool.setuptools]
 packages = ["jrpc_oo"]
 
 [tool.pytest.ini_options]
-testpaths = ["python/tests"]
+testpaths = ["jrpc_oo/tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]

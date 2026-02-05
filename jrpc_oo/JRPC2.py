@@ -102,8 +102,8 @@ class JRPC2:
         try:
             message = json.loads(message_str)
             
-            # Handle response
-            if 'id' in message and 'result' in message or 'error' in message:
+            # Handle response (need parentheses for correct operator precedence)
+            if 'id' in message and ('result' in message or 'error' in message):
                 request_id = message.get('id')
                 if request_id in self.requests:
                     callback = self.requests[request_id]
