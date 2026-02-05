@@ -6,7 +6,13 @@ This plan addresses issues found during the audit of the Python JRPC implementat
 
 ## Critical Issues (Phase 1)
 
-### 1.1 JRPC2.py - Response Parsing Logic Bug
+### 1.1 JRPC2.py - Response Parsing Logic Bug (FIXED - verify only)
+
+**Status:** The code at line 89 already has correct parentheses:
+```python
+if 'id' in message and 'result' in message or 'error' in message:
+```
+This still needs fixing - the current code is buggy.
 
 **File:** `jrpc_oo/JRPC2.py`
 **Line:** ~89
@@ -52,6 +58,26 @@ self.clients = {}
 Update all references in `JRPCServer.py`:
 - `start()`: `self.ws_server = await websockets.serve(...)`
 - `stop()`: `if self.ws_server:`
+
+---
+
+### 1.3 JRPCCommon.py - Missing `await` in setup_remote
+
+**File:** `jrpc_oo/JRPCCommon.py`
+**Line:** ~137
+**Severity:** HIGH
+
+**Problem:**
+```python
+remote.call('system.listComponents', [], lambda err, result: 
+    asyncio.create_task(self._handle_list_components_async(err, result, remote)))
+```
+The `remote.call()` method uses `asyncio.create_task(self._transmit_message(...))` internally, but `setup_remote` is not async. This works but creates a timing issue - if the connection is slow, `setup_done()` might never be called because the task isn't awaited.
+
+More critically, if `setup_remote` is called from a context without a running event loop, `asyncio.create_task()` will fail.
+
+**Fix:**
+Make `setup_remote` async or ensure it's always called from an async context. The JS version handles this implicitly via callbacks.
 
 ---
 
@@ -133,6 +159,237 @@ self.server = {}
 ```
 
 Or simply remove the check entirely since the class controls initialization.
+
+---
+
+### 3.2 JRPC2.py - Missing Request Timeout Handling
+
+**File:** `jrpc_oo/JRPC2.py`
+**Line:** `__init__` and `call` methods
+**Severity:** LOW
+
+**Problem:**
+The `remote_timeout` parameter is stored but never used. Pending requests in `self.requests` are never cleaned up if the remote doesn't respond, causing memory leaks and hanging callbacks.
+
+The JavaScript implementation uses `jrpc` library which handles timeouts internally.
+
+**Fix:**
+Add timeout handling in the `call` method:
+```python
+def call(self, method: str, params: Any, callback: Callable):
+    request_id = str(uuid.uuid4())
+    # ... existing code ...
+    
+    # Schedule timeout cleanup
+    async def timeout_handler():
+        await asyncio.sleep(self.remote_timeout)
+        if request_id in self.requests:
+            cb = self.requests.pop(request_id)
+            cb(Exception(f"Request timeout after {self.remote_timeout}s"), None)
+    
+    asyncio.create_task(timeout_handler())
+```
+
+---
+
+### 3.3 JRPCClient.py - Missing Reconnection Logic
+
+**File:** `jrpc_oo/JRPCClient.py`
+**Severity:** LOW
+
+**Problem:**
+When the connection drops, there's no automatic reconnection. The JavaScript browser client allows setting `serverURI` again to reconnect, but the Python client has no equivalent mechanism.
+
+**Fix:**
+Add a `reconnect()` method or allow `connect()` to be called multiple times:
+```python
+async def reconnect(self, delay: float = 1.0):
+    """Attempt to reconnect after a delay."""
+    await asyncio.sleep(delay)
+    await self.connect()
+```
+
+---
+
+### 3.4 ExposeClass.py - Async Method Support
+
+**File:** `jrpc_oo/ExposeClass.py`
+**Line:** ~50-65 (wrapper function)
+**Severity:** LOW
+
+**Problem:**
+The wrapper in `expose_all_fns` doesn't properly handle async methods. If an exposed method is `async def`, calling it returns a coroutine that's never awaited.
+
+**Fix:**
+```python
+def wrapper(params, next_cb, method_name=method_name):
+    """Wrapper function for the method call."""
+    try:
+        method = getattr(cls_instance, method_name)
+        
+        # Handle args format used by JS implementation
+        if isinstance(params, dict) and 'args' in params:
+            args = params['args']
+            if isinstance(args, list):
+                result = method(*args)
+            else:
+                result = method(args)
+        else:
+            result = method(params)
+        
+        # Handle async methods
+        if asyncio.iscoroutine(result):
+            async def await_and_callback():
+                try:
+                    actual_result = await result
+                    return next_cb(None, actual_result)
+                except Exception as e:
+                    return next_cb(str(e), None)
+            asyncio.create_task(await_and_callback())
+            return  # Don't call next_cb here
+            
+        return next_cb(None, result)
+    except Exception as e:
+        print(f"Failed: {e}")
+        return next_cb(str(e), None)
+```
+
+---
+
+### 3.5 JRPCCommon.py - Race Condition in setup_fns
+
+**File:** `jrpc_oo/JRPCCommon.py`
+**Line:** ~170-230
+**Severity:** LOW
+
+**Problem:**
+When multiple remotes connect simultaneously, there's a race condition where `self.call[fn_name]` might be partially set up when another remote triggers `setup_fns`.
+
+**Fix:**
+Use a lock or atomic updates:
+```python
+def __init__(self):
+    # ... existing code ...
+    self._setup_lock = asyncio.Lock()
+
+async def setup_fns_safe(self, fn_names, remote):
+    async with self._setup_lock:
+        self.setup_fns(fn_names, remote)
+```
+
+---
+
+### 3.6 JRPCServer.py - Unused `clients` Dictionary
+
+**File:** `jrpc_oo/JRPCServer.py`
+**Line:** 22
+**Severity:** LOW
+
+**Problem:**
+```python
+self.clients = {}
+```
+This dictionary is initialized but never populated or used. The parent class `JRPCCommon` already tracks remotes via `self.remotes`.
+
+**Fix:**
+Remove the unused `self.clients = {}` line, or if client tracking by websocket is needed, implement it properly.
+
+---
+
+### 3.7 JRPCClient.py - Blocking `connect()` Design
+
+**File:** `jrpc_oo/JRPCClient.py`
+**Line:** ~30-50
+**Severity:** LOW
+
+**Problem:**
+The `connect()` method enters `async for message in self.ws:` which blocks until the connection closes. This means:
+1. Code after `await client.connect()` only runs after disconnect
+2. The caller can't do anything else with the client
+
+The JS version uses event handlers (`ws.on('message', ...)`) which don't block.
+
+**Fix:**
+Split into connect + message loop, or spawn the message loop as a background task:
+```python
+async def connect(self):
+    """Connect to the WebSocket server."""
+    self.ws = await websockets.connect(self.server_uri)
+    self.connected = True
+    remote = self.create_remote(self.ws)
+    
+    # Spawn message handler as background task
+    self._message_task = asyncio.create_task(self._message_loop(remote))
+
+async def _message_loop(self, remote):
+    """Handle incoming messages in background."""
+    try:
+        async for message in self.ws:
+            if isinstance(message, bytes):
+                message = message.decode('utf-8')
+            remote.receive(message)
+    except websockets.exceptions.ConnectionClosed:
+        self.connected = False
+```
+
+---
+
+### 3.8 JRPCCommon.py - IS_BROWSER Check Never True
+
+**File:** `jrpc_oo/JRPCCommon.py`
+**Lines:** 14-18
+**Severity:** LOW
+
+**Problem:**
+```python
+try:
+    import websockets
+    IS_BROWSER = False
+except ImportError:
+    IS_BROWSER = True
+```
+This check is vestigial from the JS implementation. In Python, `websockets` will always be available (it's a dependency), and Python code never runs "in browser" in the same way JS does. The `IS_BROWSER` variable is defined but never used anywhere.
+
+**Fix:**
+Remove the dead code:
+```python
+import websockets
+
+# Remove IS_BROWSER entirely - Python doesn't run in browsers
+```
+
+---
+
+### 3.9 ExposeClass.py - `inspect.isfunction` vs `inspect.ismethod`
+
+**File:** `jrpc_oo/ExposeClass.py`
+**Line:** 36
+**Severity:** LOW
+
+**Problem:**
+```python
+methods = [
+    f"{class_name}.{name}" 
+    for name, method in inspect.getmembers(c, predicate=inspect.isfunction)
+    if not name.startswith('_')
+]
+```
+Using `inspect.isfunction` on a class object works, but it's fragile. When iterating `cls.__mro__`, we get class objects not instances, so `isfunction` is correct. However, this misses methods decorated with `@staticmethod` or `@classmethod`.
+
+The JS version uses `Object.getOwnPropertyNames(p)` which gets all properties regardless of type, then filters by checking they're not constructor and don't start with `__`.
+
+**Fix:**
+For full parity with JS, consider:
+```python
+methods = [
+    f"{class_name}.{name}"
+    for name in dir(c)
+    if not name.startswith('_') 
+    and callable(getattr(c, name, None))
+    and name in c.__dict__  # Only methods defined on this class, not inherited
+]
+```
+Or keep current behavior but document that `@staticmethod`/`@classmethod` aren't exposed.
 
 ---
 
@@ -226,13 +483,20 @@ Create `jrpc_oo/tests/test_interop.py`:
 
 ### Phase 3: Cleanup & Tests (Day 3)
 7. [ ] Remove dead code (Issue 3.1)
-8. [ ] Complete unit test coverage
-9. [ ] Add integration tests
+8. [ ] Add request timeout handling (Issue 3.2)
+9. [ ] Add async method support in ExposeClass (Issue 3.4)
+10. [ ] Complete unit test coverage
+11. [ ] Add integration tests
 
 ### Phase 4: Interop Testing (Day 4)
-10. [ ] Create cross-language test harness
-11. [ ] Verify JS ↔ Python compatibility
-12. [ ] Document any behavioral differences
+12. [ ] Create cross-language test harness
+13. [ ] Verify JS ↔ Python compatibility
+14. [ ] Document any behavioral differences
+
+### Phase 5: Enhancements (Future)
+15. [ ] Add reconnection logic to JRPCClient (Issue 3.3)
+16. [ ] Add thread-safety for concurrent connections (Issue 3.5)
+17. [ ] Consider deprecation path for `self.server` (matches JS "legacy" comments)
 
 ---
 
@@ -290,3 +554,25 @@ test = [
 - The `self.server` dict is marked as "legacy" in JS comments - consider deprecation path
 - Python uses `async/await` throughout; ensure all callers handle this correctly
 - The `call[fn]` pattern calls ALL remotes - document this clearly
+
+---
+
+## Additional Observations
+
+### Behavioral Differences from JavaScript
+
+1. **Error Handling:** Python uses exceptions extensively; JS uses callback-style `(err, result)`. The Python implementation wraps this correctly but error propagation paths differ.
+
+2. **Event Loop:** Python requires explicit async context; JS is inherently event-driven. Test files must use `asyncio.run()` or pytest-asyncio.
+
+3. **Method Resolution:** Python's `inspect.getmembers` vs JS prototype chain walking behave slightly differently for properties vs methods.
+
+### Code Quality Improvements (Non-blocking)
+
+1. **Type Hints:** Add comprehensive type hints to all public methods for better IDE support and documentation.
+
+2. **Logging:** Replace `print()` statements with proper `logging` module usage for production readiness.
+
+3. **Docstrings:** Some methods lack docstrings or have incomplete documentation.
+
+4. **Constants:** Magic strings like `"system.listComponents"` should be constants.
