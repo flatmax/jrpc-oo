@@ -488,18 +488,21 @@ Create `jrpc_oo/tests/test_interop.py`:
 10. [x] Add async method support in ExposeClass (Issue 3.4)
 11. [x] Add unit tests for new functionality (24 tests passing)
 
-### Phase 4: Interop Testing (Day 4) - IN PROGRESS
-12. [ ] Create Python integration tests (Python server + Python client)
-13. [ ] Create cross-language test harness
-14. [ ] Test: Python client → JS server (JRPCServerTest.js)
-15. [ ] Test: JS client → Python server (JRPCServerTest.py)
-16. [ ] Test: Mixed clients (Python server with JS + Python clients)
-17. [ ] Document any behavioral differences
+### Phase 4: Interop Testing (Day 4) ✅ COMPLETE
+12. [x] Create Python integration tests (Python server + Python client) - 13 tests passing
+13. [x] Create cross-language test harness (run_interop_tests.sh)
+14. [x] Test: Python client → JS server - PASSED
+15. [x] Test: JS client → Python server - PASSED
+16. [x] Test: Mixed clients (JS + Python) → Python server - PASSED
+17. [x] Document any behavioral differences (see notes below)
+18. [x] Test: JS server → Python client (bidirectional) - PASSED
+
+All 4 cross-language interop tests passing (both directions for both server types).
 
 ### Phase 5: Enhancements (Future)
-15. [ ] Add reconnection logic to JRPCClient (Issue 3.3)
-16. [ ] Add thread-safety for concurrent connections (Issue 3.5)
-17. [ ] Consider deprecation path for `self.server` (matches JS "legacy" comments)
+18. [ ] Add reconnection logic to JRPCClient (Issue 3.3)
+19. [ ] Add thread-safety for concurrent connections (Issue 3.5)
+20. [ ] Consider deprecation path for `self.server` (matches JS "legacy" comments)
 
 ---
 
