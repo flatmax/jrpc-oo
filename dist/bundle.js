@@ -220,9 +220,9 @@ Window.JRPC = JRPC;
 
 
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined'){  // nodejs
-  var ExposeClass = require("./ExposeClass.js");
+  var ExposeClass = ({});
   var crypto = require('crypto');
-  var JRPC$1 = require('jrpc');
+  var JRPC$1 = ({});
   var LitElement=class {};
 } else {  // browser
   if (!crypto)

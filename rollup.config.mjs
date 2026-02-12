@@ -20,6 +20,8 @@ export default {
     replace({
       'require("crypto")': '({})', // Replace with an empty object
       'require("timers")': '({})', // Replace with an empty object
+      'require("./ExposeClass.js")': '({})', // Already bundled inline
+      'require(\'jrpc\')': '({})', // Already bundled inline via JRPCExport
       preventAssignment: true, // Important to avoid accidental assignments
     }),
   ]
