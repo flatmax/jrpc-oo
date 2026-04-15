@@ -13,3 +13,4 @@ package-lock.json
 .aicoder/
 playwright-report/
 test-results/
+.ac-dc/
