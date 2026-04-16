@@ -329,6 +329,165 @@ import { JRPCClient } from '@flatmax/jrpc-oo/jrpc-client.js';
 
 ---
 
+## Calling Server Methods from the Browser Client
+
+### The Setup Flow
+
+When jrpc-oo connects, the server and client **exchange their registered class.method names** automatically via `system.listComponents`. After `setupDone()` fires, both sides know what the other side exposes.
+
+### Server Side (Python)
+
+```python
+from jrpc_oo import JRPCServer
+
+class MyApi:
+    def get_data(self, query):
+        return {"results": [1, 2, 3], "query": query}
+    
+    def add(self, a, b):
+        return a + b
+
+server = JRPCServer(port=8765)
+server.add_class(MyApi(), 'MyApi')
+await server.start()
+```
+
+This registers `MyApi.get_data` and `MyApi.add` as callable methods.
+
+### Browser Side — Two Ways to Call Server Methods
+
+There are **two calling mechanisms**: `this.server` and `this.call`. They have different response formats.
+
+---
+
+#### 1. `this.server['ClassName.method_name'](args)` — Single Remote
+
+This calls **one** remote. It returns a **Promise that resolves directly to the result value**.
+
+Under the hood in `JRPCCommon.js` `setupFns()`:
+
+```js
+this.server[fnName] = function (params) {
+    return new Promise((resolve, reject) => {
+        remote.call(fnName, {args : Array.from(arguments)}, (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+        });
+    });
+};
+```
+
+Usage:
+
+```js
+this.server['MyApi.get_data']({query: 'test'}).then((result) => {
+    // result IS the return value directly — e.g. {"results": [1,2,3], "query": "test"}
+    console.log(result);
+}).catch((err) => {
+    console.error(err);
+});
+```
+
+**⚠️ Caveat:** if two remotes expose the same method name, `this.server[fnName]` gets replaced with an error function that rejects with `"More than one remote has this RPC, not sure who to talk to"`. This is the legacy API.
+
+---
+
+#### 2. `this.call['ClassName.method_name'](args)` — All Remotes (Recommended)
+
+This calls **every connected remote** that has that method. It returns a **Promise that resolves to an object keyed by UUID**.
+
+Under the hood in `JRPCCommon.js` `setupFns()`:
+
+```js
+this.call[fnName] = (...args) => {
+    let promises = [];
+    let rems = [];
+    for (const remote in this.remotes) {
+        if (this.remotes[remote].rpcs[fnName] != null) {
+            rems.push(remote);
+            promises.push(this.remotes[remote].rpcs[fnName](...args));
+        }
+    }
+    return Promise.all(promises).then((data) => {
+        let p = {};
+        rems.forEach((v, n) => p[v] = data[n]);
+        return p;
+    });
+}
+```
+
+So the response shape is:
+
+```js
+this.call['MyApi.get_data']({query: 'test'}).then((result) => {
+    // result is: { "uuid-of-server-1": {results: [1,2,3], query: "test"} }
+    // If multiple remotes had this method, each UUID is a key:
+    // { "uuid-1": <result1>, "uuid-2": <result2> }
+    
+    // To get the single server's result:
+    let firstResult = Object.values(result)[0];
+    console.log(firstResult);
+}).catch((err) => {
+    console.error(err);
+});
+```
+
+**Yes — `this.call` returns `{ uuid: responseValue }` as the resolved Promise value.**
+
+---
+
+### Response Format Summary
+
+| Mechanism | Calls | Response Shape | Safe with multiple remotes? |
+|---|---|---|---|
+| `this.server['Cls.method'](args)` | One remote | Direct result value | ❌ Errors if ambiguous |
+| `this.call['Cls.method'](args)` | All remotes | `{ uuid: result, ... }` | ✅ Yes |
+
+### Arguments — How They Arrive on the Server
+
+When you call `this.server['MyApi.add'](3, 5)`, the JS side wraps arguments as:
+```json
+{"args": [3, 5]}
+```
+
+This is sent as a JSON-RPC 2.0 `params` field. On the Python side, `ExposeClass` unwraps this — your Python method receives them as normal parameters: `def add(self, a, b)`.
+
+### Typical Component Pattern
+
+```js
+class MyComponent extends JRPCClient {
+    setupDone() {
+        super.setupDone();
+        console.log('Available methods:', Object.keys(this.server));
+        this.loadInitialData();
+    }
+
+    loadInitialData() {
+        // Using this.server (direct result):
+        this.server['MyApi.get_data']({query: 'initial'}).then((result) => {
+            this.data = result;  // the actual return value
+            this.requestUpdate();
+        });
+
+        // OR using this.call (uuid-keyed result):
+        this.call['MyApi.get_data']({query: 'initial'}).then((result) => {
+            this.data = Object.values(result)[0];  // unwrap from UUID key
+            this.requestUpdate();
+        });
+    }
+}
+```
+
+### Registering Client Methods (Server → Browser Calls)
+
+`this.addClass(this, 'MyComponent')` registers methods that the **server** can call **on the client** — it's the reverse direction. Only needed if the server needs to push calls to the browser.
+
+### Debugging Tip
+
+Log `Object.keys(this.server)` and `Object.keys(this.call)` inside `setupDone()` to see exactly which server methods are available — the names must match exactly (case-sensitive, dot-separated).
+
+---
+
 ## Summary
 
 | Piece | What to do |
@@ -337,6 +496,7 @@ import { JRPCClient } from '@flatmax/jrpc-oo/jrpc-client.js';
 | **Browser client** | Extend `JRPCClient`, register as custom element, set `serverURI`, append to DOM |
 | **Port finding** | Bind-test ports starting from a default; pass the chosen port to the browser via `?port=N` |
 | **Auto-open browser** | `webbrowser.open(url)` after `await server.start()` |
-| **Calling methods** | `(await client['methodName'](args)).values()` |
+| **Calling methods (single)** | `this.server['ClassName.method'](args).then(result => ...)` — resolves to direct value |
+| **Calling methods (all remotes)** | `this.call['ClassName.method'](args).then(result => ...)` — resolves to `{uuid: value}` |
 | **Lifecycle** | `setupDone()` = connected and ready; `remoteDisconnected(uuid)` = server gone |
 | **Keep alive** | `await asyncio.Event().wait()` after starting the server; handle `SIGINT`/`SIGTERM` for clean shutdown |
